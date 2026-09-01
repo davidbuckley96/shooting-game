@@ -69,12 +69,16 @@ Transformar o protótipo em jogo com decisões interessantes.
 - [x] 3 tipos de inimigos (goblin rápido, bruto tanque, **chefão** a cada 5 noites) — falta avaliar inimigo à distância
 - [ ] Curva de dificuldade e balanceamento da economia (planilha de tuning + simulações automáticas)
 - [ ] Variedade de mapa (obstáculos, pontos de spawn variados)
+- [ ] **Rei com ataque à distância (arco), alcance ~4x o atual** — decisão do David (kiting é o núcleo do gameplay)
+- [ ] **Hordas maiores** para viabilizar kiting (rebalancear waves/economia junto)
 - [ ] Habilidade especial do rei (ex.: investida da cavalaria com cooldown)
 - [x] Recorde persistente (localStorage) e estatísticas de fim de partida (abates/noites)
 
-## FASE 3 — Polimento (game feel, arte e som) ⬜
+## FASE 3 — Polimento (game feel, arte e som) 🔨
 
-- [ ] Arte procedural caprichada: rei/cavalo animados, inimigos com personalidade, castelo bonito
+- [ ] **Identidade visual em definição** — rodada 1 de propostas enviada (`design/art-proposals.html`):
+      A) Cartoon Chunky · B) Flat Suave · C) Low-poly · D) Pixel Art HD — aguardando julgamento do David
+- [ ] Arte procedural caprichada: rei/cavalo animados, inimigos com personalidade, castelo bonito (na identidade escolhida)
 - [ ] Partículas, tremor de tela, números de dano, knockback, flashes de acerto
 - [ ] Efeitos sonoros sintetizados (moeda, construção, corneta da noite, amanhecer, derrota)
 - [ ] Música simples de fundo (dia calmo / noite tensa) com botão de mudo
@@ -136,3 +140,6 @@ Backlog aberto — priorizar com feedback de quem jogar.
   em velocidade 6x, screenshots verificados. Balanceamento inicial ajustado após playtests
   automatizados (torres +DPS, castelo 400 HP, horda inicial menor). Upgrades, reparo,
   brutos e chefões já implementados (adiantando a Fase 2).
+- **2026-09-01 (3)** — Feedback do David: gráficos mais cartoonizados, rei com ataque
+  à distância (~4x) e hordas maiores p/ kiting. Criada a cena de referência com 4 propostas
+  de identidade visual renderizadas em canvas (mesma composição) para julgamento.
