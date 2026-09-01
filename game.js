@@ -125,11 +125,34 @@ let best = 0;
 try { best = parseInt(localStorage.getItem('tinyking.best') || '0', 10) || 0; } catch (e) {}
 
 // ---- meta-progressão persistente (ouro e melhorias compradas no menu) ----
-const META_DEFAULT = { gold: 0, mission: 1, atk: 0, hp: 0, tower3: false, mud: false, repair: false, bomb: 0, freeze: 0 };
+const META_DEFAULT = { gold: 0, mission: 1, atk: 0, hp: 0, tower3: false, mud: false, repair: false, bomb: 0, freeze: 0,
+  equip: { arma: 'espada-real', escudo: 'escudo-coroa' } };
 let meta = Object.assign({}, META_DEFAULT);
 try { meta = Object.assign({}, META_DEFAULT, JSON.parse(localStorage.getItem('tinyking.meta') || '{}')); } catch (e) {}
 function saveMeta() { try { localStorage.setItem('tinyking.meta', JSON.stringify(meta)); } catch (e) {} }
 const kingDmg = () => 16 + 4 * meta.atk;
+
+// ---- registro de itens do jogo (adicionar novos itens = novas entradas aqui) ----
+const ITEMS = {
+  'espada-real':  { icon: '🗡️', nome: 'Espada Real', tipo: 'Arma',
+                    desc: () => `Golpe em área à frente. Dano ${kingDmg()}, alcance ${KING_RANGE}.` },
+  'escudo-coroa': { icon: '🛡️', nome: 'Escudo da Coroa', tipo: 'Escudo',
+                    desc: () => 'O brasão real protege o rei em combate.' },
+  'arco-real':    { icon: '🏹', nome: 'Arco Real', tipo: 'Arma', locked: true,
+                    desc: () => 'Ataque à distância. Será desbloqueado numa atualização futura.' },
+  'poder-real':   { icon: '✨', nome: 'Poder Real', tipo: 'Habilidade', locked: true,
+                    desc: () => 'Magias do trono. Em breve.' },
+  'bomba':        { icon: '💣', nome: 'Bomba', tipo: 'Consumível', qty: () => meta.bomb,
+                    desc: () => 'Explode ao redor do rei (70 de dano em área).' },
+  'congelar':     { icon: '❄️', nome: 'Gelo Real', tipo: 'Consumível', qty: () => meta.freeze,
+                    desc: () => 'Congela todos os inimigos por 5s.' },
+  'lama':         { icon: '🟤', nome: 'Lama Pegajosa', tipo: 'Construção', owned: () => meta.mud,
+                    desc: () => 'Área que atrasa inimigos. Construível na batalha.' },
+  'reparo':       { icon: '🔨', nome: 'Kit de Reparo', tipo: 'Ferramenta', owned: () => meta.repair,
+                    desc: () => 'Repara o casarão gastando moedas, perto da porta.' },
+  'torre3':       { icon: '🏰', nome: 'Planta: Torre Nv.3', tipo: 'Conhecimento', owned: () => meta.tower3,
+                    desc: () => 'Permite melhorar torres até o nível 3.' },
+};
 const KING_RANGE = 125;            // +30% sobre os 95 originais
 const maxTowerLvl = () => meta.tower3 ? 3 : 2;
 
@@ -150,11 +173,28 @@ const LEVEL_DIRS = [
 ];
 const levelDir = (n) => LEVEL_DIRS[(n - 1) % LEVEL_DIRS.length];
 
-// canteiros de torres (fixos, cobrem todas as aproximações)
-const plots = [
-  [520, 650], [880, 650], [560, 880], [840, 880],
-  [300, 780], [1100, 780], [700, 1030], [1040, 470], [360, 470],
-].map(([x, y]) => ({ x, y, level: 0, cd: 0, kind: null }));
+// construções livres: o jogador ergue torres/lama onde o rei estiver
+let builds = [];
+const BUILD_GAP = 85;       // distância mínima entre construções
+const LANE_CLEAR = 60;      // não pode construir em cima da lane
+function distToPath(x, y) {
+  const path = levelDir(level).path;
+  let best = Infinity;
+  for (let i = 0; i < path.length - 1; i++) {
+    const [ax, ay] = path[i], [bx, by] = path[i + 1];
+    const vx = bx - ax, vy = by - ay;
+    const t = clamp(((x - ax) * vx + (y - ay) * vy) / (vx * vx + vy * vy || 1), 0, 1);
+    best = Math.min(best, dist(x, y, ax + vx * t, ay + vy * t));
+  }
+  return best;
+}
+function placeBlockReason(x, y) {
+  if (x < 60 || y < 60 || x > WORLD.w - 60 || y > WORLD.h - 60) return 'longe da borda';
+  if (dist(x, y, MANOR.x, MANOR.y) < 160) return 'longe do casarão';
+  if (distToPath(x, y) < LANE_CLEAR) return 'fora da estrada';
+  for (const b of builds) if (dist(x, y, b.x, b.y) < BUILD_GAP) return 'longe de outra construção';
+  return null;
+}
 
 // decoração fixa
 const decor = { pines: [], rocks: [], flowers: [] };
@@ -162,7 +202,6 @@ const decor = { pines: [], rocks: [], flowers: [] };
   dseed = 12;
   const clear = (x, y) => {
     if (dist(x, y, MANOR.x, MANOR.y) < 260 || dist(x, y, king.x, 700) < 120) return false;
-    for (const p of plots) if (dist(x, y, p.x, p.y) < 90) return false;
     for (const d of LEVEL_DIRS) for (const [px, py] of d.path) if (dist(x, y, px, py) < 110) return false;
     return true;
   };
@@ -245,6 +284,34 @@ $('menuBtn').addEventListener('click', () => { audioCtx(); showMenu(); });
 waveBtn.addEventListener('click', () => { if (state === 'play' && wavePhase === 'countdown') waveTimer = 0; });
 $('bombBtn').addEventListener('click', () => { audioCtx(); useBomb(); });
 $('freezeBtn').addEventListener('click', () => { audioCtx(); useFreeze(); });
+const invEl = $('inventory'), invList = $('invList');
+$('invBtn').addEventListener('click', () => { audioCtx(); renderInventory(); menuEl.classList.add('hidden'); invEl.classList.remove('hidden'); });
+$('invCloseBtn').addEventListener('click', () => { invEl.classList.add('hidden'); menuEl.classList.remove('hidden'); });
+function invCard(id, extra = '') {
+  const it = ITEMS[id];
+  if (!it) return '';
+  const locked = it.locked;
+  return `<div class="invItem${locked ? ' locked' : ''}">` +
+    `<span class="si-ico">${locked ? '🔒' : it.icon}</span>` +
+    `<span class="si-nome">${it.nome} ${extra}<br><small>${it.desc()}</small></span>` +
+    `<span class="invTipo">${it.tipo}</span></div>`;
+}
+function renderInventory() {
+  let html = '<h3>⚔️ Equipado</h3>';
+  html += invCard(meta.equip.arma);
+  html += invCard(meta.equip.escudo);
+  html += '<h3>🎒 Mochila</h3>';
+  let any = false;
+  for (const [id, it] of Object.entries(ITEMS)) {
+    if (id === meta.equip.arma || id === meta.equip.escudo || it.locked) continue;
+    if (it.qty) { if (it.qty() > 0) { html += invCard(id, `<b>x${it.qty()}</b>`); any = true; } }
+    else if (it.owned && it.owned()) { html += invCard(id); any = true; }
+  }
+  if (!any) html += '<p style="opacity:.7">Vazia — compre itens no Mercado do Reino.</p>';
+  html += '<h3>🔮 Em breve</h3>';
+  for (const [id, it] of Object.entries(ITEMS)) if (it.locked) html += invCard(id);
+  invList.innerHTML = html;
+}
 $('muteBtn').addEventListener('click', () => {
   muted = !muted;
   $('muteBtn').textContent = muted ? '🔇' : '🔊';
@@ -309,7 +376,7 @@ function resetGame() {
   king.maxHp = 80 + 20 * meta.hp;
   king.x = 700; king.y = 720; king.hp = king.maxHp;
   king.dead = false; king.respawn = 0; king.cd = 0; king.attackT = 0; king.dirKey = 'frente';
-  for (const p of plots) { p.level = 0; p.cd = 0; p.kind = null; }
+  builds = [];
   freezeT = 0;
   enemies = []; bolts = []; coinDrops = []; parts = []; floats = [];
   wavePlan = { queue: [], t: 0 };
@@ -427,13 +494,14 @@ function dropCoins(x, y, val) {
 
 // ---------------- Construção ----------------
 const MUD_COST = 30;
-function tryBuild(p, kind = 'tower') {
-  if (p.kind) return false;
+function tryBuildHere(kind = 'tower') {
+  if (king.dead || placeBlockReason(king.x, king.y)) return false;
   const cost = kind === 'mud' ? MUD_COST : TOWER.cost;
   if (coins < cost || (kind === 'mud' && !meta.mud)) return false;
-  coins -= cost; p.kind = kind; p.level = 1; p.cd = 0;
+  coins -= cost;
+  builds.push({ x: king.x, y: king.y, kind, level: 1, cd: 0 });
   sfx.build();
-  addParts(p.x, p.y - 20, kind === 'mud' ? '#8a6b42' : '#cfd4d8', 14, 100, 0.6, 3);
+  addParts(king.x, king.y - 20, kind === 'mud' ? '#8a6b42' : '#cfd4d8', 14, 100, 0.6, 3);
   renderStatic(); panelSig = '';
   return true;
 }
@@ -582,8 +650,8 @@ function update(dt) {
     // velocidade efetiva: congelamento e lama atrasam
     let spd = e.spd;
     if (freezeT > 0) spd *= 0.3;
-    for (const p of plots) {
-      if (p.kind === 'mud' && dist2(e.x, e.y, p.x, p.y) < 115 * 115) { spd *= 0.45; break; }
+    for (const b of builds) {
+      if (b.kind === 'mud' && dist2(e.x, e.y, b.x, b.y) < 115 * 115) { spd *= 0.45; break; }
     }
     // rei por perto? PERSEGUE (nada de apanhar de graça à distância)
     if (!king.dead) {
@@ -633,7 +701,7 @@ function update(dt) {
   }
 
   // --- torres ---
-  for (const p of plots) {
+  for (const p of builds) {
     if (p.kind !== 'tower') continue;
     p.cd -= dt;
     if (p.cd > 0) continue;
@@ -719,10 +787,10 @@ function update(dt) {
 
 // ---------------- Painel de construção & HUD ----------------
 let panelSig = '';
-function nearPlot() {
+function nearBuild() {
   if (king.dead) return null;
-  let bp = null, bd = 85 * 85;
-  for (const p of plots) {
+  let bp = null, bd = 80 * 80;
+  for (const p of builds) {
     const d = dist2(king.x, king.y, p.x, p.y);
     if (d < bd) { bd = d; bp = p; }
   }
@@ -747,25 +815,27 @@ function refreshPanel() {
     }
     return;
   }
-  const p = nearPlot();
+  const p = nearBuild();
   if (!p) {
-    if (panelSig !== 'off') { panelSig = 'off'; buildPanel.classList.add('hidden'); }
-    return;
-  }
-  const idx = plots.indexOf(p);
-  let sig;
-  if (!p.kind) {
-    const okT = coins >= TOWER.cost;
-    const okM = meta.mud && coins >= MUD_COST;
-    sig = `e${idx}|${okT ? 1 : 0}|${okM ? 1 : 0}|${meta.mud ? 1 : 0}`;
-    if (sig !== panelSig) {
-      panelSig = sig;
-      buildPanel.innerHTML = `<span class="lbl">Canteiro:</span>` +
-        `<button data-act="build" ${okT ? '' : 'disabled'}>🏰 Torre<br>🪙${TOWER.cost}</button>` +
-        (meta.mud ? `<button data-act="mud" ${okM ? '' : 'disabled'}>🟤 Lama<br>🪙${MUD_COST}</button>` : '');
+    // sem construção por perto: oferecer construir AQUI (colocação livre)
+    const reason = placeBlockReason(king.x, king.y);
+    const okT = !reason && coins >= TOWER.cost;
+    const okM = !reason && meta.mud && coins >= MUD_COST;
+    const sig0 = `place|${reason || ''}|${okT ? 1 : 0}|${okM ? 1 : 0}|${meta.mud ? 1 : 0}`;
+    if (sig0 !== panelSig) {
+      panelSig = sig0;
+      buildPanel.innerHTML = reason
+        ? `<span class="lbl">⛔ Para construir: ${reason}</span>`
+        : `<span class="lbl">Construir aqui:</span>` +
+          `<button data-act="build" ${okT ? '' : 'disabled'}>🏰 Torre<br>🪙${TOWER.cost}</button>` +
+          (meta.mud ? `<button data-act="mud" ${okM ? '' : 'disabled'}>🟤 Lama<br>🪙${MUD_COST}</button>` : '');
       buildPanel.classList.remove('hidden');
     }
-  } else if (p.kind === 'mud') {
+    return;
+  }
+  const idx = builds.indexOf(p);
+  let sig;
+  if (p.kind === 'mud') {
     sig = `m${idx}`;
     if (sig !== panelSig) {
       panelSig = sig;
@@ -790,11 +860,10 @@ buildPanel.addEventListener('click', e => {
   const btn = e.target.closest('button');
   if (!btn) return;
   if (btn.dataset.act === 'repair') { tryRepairManor(); return; }
-  const p = nearPlot();
-  if (!p) return;
-  if (btn.dataset.act === 'build') tryBuild(p, 'tower');
-  else if (btn.dataset.act === 'mud') tryBuild(p, 'mud');
-  else if (btn.dataset.act === 'up') tryUpgrade(p);
+  if (btn.dataset.act === 'build') { tryBuildHere('tower'); return; }
+  if (btn.dataset.act === 'mud') { tryBuildHere('mud'); return; }
+  const p = nearBuild();
+  if (p && btn.dataset.act === 'up') tryUpgrade(p);
 });
 function updateUI(dt) {
   uiCoins.textContent = coins;
@@ -1068,27 +1137,14 @@ function renderStatic() {
   }
   // pedras
   for (const r0 of decor.rocks) drawRock(g, r0);
-  // bases dos canteiros
-  for (const p of plots) {
-    if (p.kind === 'mud') {
-      const mg = g.createRadialGradient(p.x, p.y + 8, 10, p.x, p.y + 8, 115);
-      mg.addColorStop(0, 'rgba(110,80,45,.85)'); mg.addColorStop(.75, 'rgba(110,80,45,.5)'); mg.addColorStop(1, 'rgba(110,80,45,0)');
-      g.fillStyle = mg; g.beginPath(); g.ellipse(p.x, p.y + 8, 115, 74, 0, 0, TAU); g.fill();
-      g.fillStyle = 'rgba(70,48,25,.5)';
-      for (let i = 0; i < 7; i++) g.beginPath(), g.ellipse(p.x + (drnd() * 140 - 70), p.y + 8 + (drnd() * 80 - 40), 9 + drnd() * 8, 5 + drnd() * 4, drnd(), 0, TAU), g.fill();
-      continue;
-    }
-    g.fillStyle = 'rgba(160,130,80,.35)';
-    g.beginPath(); g.ellipse(p.x, p.y + 8, 34, 20, 0, 0, TAU); g.fill();
-    if (!p.kind) {
-      g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 3; g.setLineDash([9, 8]);
-      g.beginPath(); g.ellipse(p.x, p.y + 8, 34, 20, 0, 0, TAU); g.stroke();
-      g.setLineDash([]);
-      g.fillStyle = 'rgba(255,255,255,.85)';
-      g.font = 'bold 26px system-ui'; g.textAlign = 'center';
-      g.fillText('+', p.x, p.y + 17);
-      g.textAlign = 'left';
-    }
+  // lamas construídas
+  for (const p of builds) {
+    if (p.kind !== 'mud') continue;
+    const mg = g.createRadialGradient(p.x, p.y + 8, 10, p.x, p.y + 8, 115);
+    mg.addColorStop(0, 'rgba(110,80,45,.85)'); mg.addColorStop(.75, 'rgba(110,80,45,.5)'); mg.addColorStop(1, 'rgba(110,80,45,0)');
+    g.fillStyle = mg; g.beginPath(); g.ellipse(p.x, p.y + 8, 115, 74, 0, 0, TAU); g.fill();
+    g.fillStyle = 'rgba(70,48,25,.5)';
+    for (let i = 0; i < 7; i++) g.beginPath(), g.ellipse(p.x + (drnd() * 140 - 70), p.y + 8 + (drnd() * 80 - 40), 9 + drnd() * 8, 5 + drnd() * 4, drnd(), 0, TAU), g.fill();
   }
   // moldura do mundo
   g.strokeStyle = 'rgba(30,60,15,.5)'; g.lineWidth = 10;
@@ -1135,12 +1191,18 @@ function render() {
   dseed = 31;
   const drawables = [];
   drawables.push({ y: MANOR.y + 66, fn: () => drawManor(ctx) });
-  for (const p of plots) if (p.kind === 'tower') drawables.push({ y: p.y + 28, fn: () => drawTower(ctx, p.x, p.y, p.level) });
+  for (const p of builds) if (p.kind === 'tower') drawables.push({ y: p.y + 28, fn: () => drawTower(ctx, p.x, p.y, p.level) });
   for (const t of decor.pines) drawables.push({ y: t.y + 6, fn: () => drawPine(ctx, t.x, t.y, t.s) });
   for (const e of enemies) drawables.push({ y: e.y + 9 * e.s, fn: () => drawEnemy(ctx, e) });
   if (state !== 'menu') drawables.push({ y: king.dead ? -9999 : king.y + 13, fn: () => drawKing(ctx) });
   drawables.sort((a, b) => a.y - b.y);
   for (const d of drawables) d.fn();
+  // indicador de local de construção (colocação livre)
+  if (state === 'play' && !king.dead && !nearBuild() && !placeBlockReason(king.x, king.y)) {
+    ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 3; ctx.setLineDash([8, 8]);
+    ctx.beginPath(); ctx.ellipse(king.x, king.y + 10, 36, 21, 0, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+  }
   // barra de HP do casarão
   if (MANOR.hp < MANOR.maxHp) {
     ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.beginPath(); ctx.roundRect(MANOR.x - 55, MANOR.y - 175, 110, 10, 5); ctx.fill();
@@ -1222,18 +1284,21 @@ window.__game = {
   get kingPos() { return { x: king.x, y: king.y }; },
   get kingHp() { return king.hp; },
   get kills() { return stats.kills; },
-  get plotInfo() { return plots.map(p => ({ level: p.level, kind: p.kind })); },
+  get builds() { return builds.map(p => ({ x: p.x, y: p.y, level: p.level, kind: p.kind })); },
   get wave() { return { num: waveNum, total: waveTotal, phase: wavePhase, timer: waveTimer }; },
   get meta() { return JSON.parse(JSON.stringify(meta)); },
   get freezeT() { return freezeT; },
+  get inventoryOpen() { return !invEl.classList.contains('hidden'); },
+  get itemCount() { return Object.keys(ITEMS).length; },
   get spritesReady() { return spritesReady; },
   get cam() { return { x: cam.x, y: cam.y }; },
   get view() { return { vw: VW, vh: VH, dpr: DPR, cw: canvas.width, rect: canvas.getBoundingClientRect().width }; },
   get timeScale() { return timeScale; },
   set timeScale(v) { timeScale = clamp(v, 0.1, 20); },
   addCoins(n) { coins += n; },
-  buildAt(i, kind = 'tower') { const p = plots[i]; if (p && !p.kind) { coins += kind === 'mud' ? MUD_COST : TOWER.cost; return tryBuild(p, kind); } return false; },
-  upgradeAt(i) { const p = plots[i]; if (p && p.level > 0) { coins += TOWER.upCost(p.level); return tryUpgrade(p); } return false; },
+  buildAtPos(x, y, kind = 'tower') { builds.push({ x, y, kind, level: 1, cd: 0 }); renderStatic(); return true; },
+  buildHere(kind = 'tower') { coins += kind === 'mud' ? MUD_COST : TOWER.cost; return tryBuildHere(kind); },
+  upgradeAt(i) { const p = builds[i]; if (p && p.kind === 'tower') { coins += TOWER.upCost(p.level); return tryUpgrade(p); } return false; },
   teleport(x, y) { king.x = x; king.y = y; },
   skipCountdown() { if (state === 'play' && wavePhase === 'countdown') waveTimer = 0; },
   addGold(n) { meta.gold += n; saveMeta(); renderShop(); },

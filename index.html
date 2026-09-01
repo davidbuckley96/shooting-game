@@ -61,6 +61,14 @@
     background:linear-gradient(#5b4dbf,#3d3190);color:#fff;box-shadow:0 3px 0 #241c60}
   #consumables button:disabled{filter:grayscale(1);opacity:.5}
   #menu h3{margin:6px 0 0}
+  #inventory h3{margin:8px 0 0;align-self:flex-start}
+  .invItem{display:flex;align-items:center;gap:10px;border-radius:14px;padding:10px 12px;
+    background:rgba(255,255,255,.10);color:#fff;text-align:left;font-size:14px}
+  .invItem.locked{opacity:.45}
+  .invItem .si-nome{flex:1;font-weight:700;line-height:1.3}
+  .invItem .si-nome small{font-weight:400;opacity:.75}
+  .invTipo{font-size:11px;font-weight:800;background:rgba(255,255,255,.15);
+    border-radius:999px;padding:3px 9px;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -82,11 +90,19 @@
   <p id="menuBest" style="opacity:.85"></p>
   <div id="menuGoldPill">💰 Ouro: <span id="uiGold">0</span></div>
   <button id="playBtn" class="big">▶ Nível <span id="uiMission">1</span></button>
+  <button id="invBtn" class="big" style="background:linear-gradient(#7a8ff0,#4a5ecc);color:#fff;box-shadow:0 5px 0 #2a3a99;font-size:16px;padding:11px 30px">🎒 Inventário</button>
   <h3>🛒 Mercado do Reino</h3>
   <div id="shop"></div>
   <p style="font-size:13px;opacity:.8">🕹️ arraste para mover · 🗡️ o rei ataca sozinho em área ·
   🏰 torres são indestrutíveis · 🚨 waves vêm sozinhas, de uma direção por nível ·
   🪙 moedas não gastas viram ouro do mercado</p>
+</div>
+
+<div id="inventory" class="overlay hidden">
+  <h1>🎒 Inventário</h1>
+  <p style="opacity:.8">O equipamento do rei e tudo que ele carrega</p>
+  <div id="invList" style="display:flex;flex-direction:column;gap:8px;width:min(92vw,400px)"></div>
+  <button id="invCloseBtn" class="big" style="margin-top:10px">✔ Fechar</button>
 </div>
 
 <div id="levelEnd" class="overlay center hidden">

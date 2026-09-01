@@ -174,3 +174,9 @@ Backlog aberto — priorizar com feedback de quem jogar.
   congelar x3 — consumíveis com botões no jogo); alcance do rei +30% (95->125); bug do
   "ataque covarde" corrigido: inimigos agora PERSEGUEM o rei no raio de 185px (kiting real).
   21 testes verdes. Republicado no link.
+- **2026-09-01 (8)** — v4 (feedback do David): TORRES EM QUALQUER LUGAR — construção livre
+  onde o rei estiver (validação: fora da lane 60px, longe do casarão/outras construções,
+  indicador tracejado no chão + motivo do bloqueio no painel); lane confirmada FIXA durante
+  o nível (só muda entre níveis); INVENTÁRIO no menu com registro de itens expansível
+  (Equipado: Espada Real/Escudo da Coroa · Mochila: consumíveis e desbloqueios · Em breve:
+  Arco Real 🔒 e Poder Real 🔒). 20 testes verdes. Republicado no link.

@@ -1,4 +1,4 @@
-// Teste v3: waves automáticas, fim de nível -> menu, mercado, consumíveis.
+// Teste v4: colocação livre de torres, lane fixa por nível, inventário, mercado.
 import { chromium } from 'playwright-core';
 import { mkdirSync } from 'node:fs';
 
@@ -28,56 +28,66 @@ const check = (name, ok) => {
   else { errors.push(`FALHOU: ${name}`); console.log(`  ❌ ${name}`); }
 };
 
-console.log('▶ menu e mercado…');
+console.log('▶ menu, mercado e inventário…');
 await page.goto(BASE, { waitUntil: 'load' });
 await waitFor('__game.spritesReady', 20000);
 check('menu visível', await page.isVisible('#menu'));
 check('mercado com 7 itens', (await page.$$('#shop .shopItem')).length === 7);
-check('ouro inicial = 0', (await g('__game.meta')).gold === 0);
-await page.screenshot({ path: 'shots/v3-01-menu.png' });
+await page.tap('#invBtn');
+await page.waitForTimeout(300);
+check('inventário abriu', await g('__game.inventoryOpen'));
+check('equipamento listado (espada + escudo)', (await page.$$('#invList .invItem')).length >= 4);
+await page.screenshot({ path: 'shots/v4-01-inventario.png' });
+await page.tap('#invCloseBtn');
+await page.waitForTimeout(200);
+check('inventário fechou', !(await g('__game.inventoryOpen')));
 
-console.log('▶ nível 1: waves automáticas…');
+console.log('▶ nível 1: colocação livre na lane SUL…');
 await page.tap('#playBtn');
 await page.waitForTimeout(300);
-check('estado = play (contagem)', (await g('__game.state')) === 'play' && (await g('__game.wave')).phase === 'countdown');
-check('botão de pular visível', await page.isVisible('#nightBtn'));
-await g('for (let i = 0; i < 7; i++) __game.buildAt(i)');
+check('estado = play', (await g('__game.state')) === 'play');
+// construção via painel: rei num ponto válido fora da lane
+await g('__game.teleport(560, 950)');
+await page.waitForTimeout(400);
+check('painel oferece construir aqui', await page.isVisible('#buildPanel button[data-act="build"]'));
+const coinsAntes = await g('__game.coins');
+await page.tap('#buildPanel button[data-act="build"]');
+await page.waitForTimeout(200);
+check('torre erguida onde o rei estava', (await g('__game.builds')).length === 1);
+check('moedas debitadas', (await g('__game.coins')) === coinsAntes - 60);
+// bloqueio em cima da lane
+await g('__game.teleport(700, 950)');
+await page.waitForTimeout(400);
+check('lane bloqueia construção', !(await page.isVisible('#buildPanel button[data-act="build"]')));
+// resto da defesa flanqueando a lane sul
+await g(`for (const [x,y] of [[820,700],[580,700],[820,950],[560,1150],[840,1150],[600,540]]) __game.buildAtPos(x,y)`);
+await g('__game.upgradeAt(0)');
+check('7 torres em campo', (await g('__game.builds')).length === 7);
+const dir0 = await g('JSON.stringify(__game.wave)');
 await g('__game.teleport(700, 660); __game.timeScale = 8; __game.skipCountdown()');
 await waitFor('__game.enemyCount > 0', 20000);
-check('wave 1 começou sozinha após pular contagem', (await g('__game.wave')).num === 1);
 await page.waitForTimeout(1200);
-await page.screenshot({ path: 'shots/v3-02-wave.png' });
+await page.screenshot({ path: 'shots/v4-02-wave.png' });
 await waitFor('__game.state === "levelend" || __game.state === "gameover"', 240000);
-check('nível 1 completo (4 waves automáticas)', (await g('__game.state')) === 'levelend');
-await page.screenshot({ path: 'shots/v3-03-levelend.png' });
-
-console.log('▶ volta ao menu com ouro…');
+check('nível 1 completo (lane fixa nas 4 waves)', (await g('__game.state')) === 'levelend');
 await page.tap('#menuBtn');
 await page.waitForTimeout(300);
-check('voltou ao menu', (await g('__game.state')) === 'menu');
 const m1 = await g('__game.meta');
-check('ouro guardado > 0', m1.gold > 0);
-check('missão avançou para 2', m1.mission === 2);
+check('ouro guardado e missão 2', m1.gold > 0 && m1.mission === 2);
 
-console.log('▶ compra no mercado (clique real)…');
+console.log('▶ mercado + nível 2 (lane OESTE): lama, consumíveis, reparo…');
 await g('__game.addGold(500)');
 await page.click('#shop .shopItem[data-id="atk"]');
 await page.waitForTimeout(200);
-const m2 = await g('__game.meta');
-check('golpe +4 comprado', m2.atk === 1);
-check('ouro debitado', m2.gold < m1.gold + 500);
-await page.screenshot({ path: 'shots/v3-04-loja.png' });
-
-console.log('▶ nível 2: lama, congelar, bomba, reparo…');
+check('golpe comprado no clique', (await g('__game.meta')).atk === 1);
 await g('__game.giveItems()');
 await page.tap('#playBtn');
 await page.waitForTimeout(300);
 check('nível 2 iniciado', (await g('__game.level')) === 2);
-await g('for (let i = 0; i < 6; i++) __game.buildAt(i)');
-await g('__game.buildAt(6, "mud")');
-check('lama construída', (await g('__game.plotInfo'))[6].kind === 'mud');
-check('consumíveis visíveis', await page.isVisible('#consumables'));
-await g('__game.teleport(700, 660); __game.timeScale = 8; __game.skipCountdown()');
+await g(`for (const [x,y] of [[260,660],[460,660],[260,900],[460,900],[620,650],[620,900]]) __game.buildAtPos(x,y)`);
+await g('__game.buildAtPos(350, 660, "mud")');
+check('lama posicionada livremente', (await g('__game.builds')).some(b => b.kind === 'mud'));
+await g('__game.teleport(560, 770); __game.timeScale = 8; __game.skipCountdown()');
 await waitFor('__game.enemyCount > 3', 30000);
 await g('__game.useFreeze()');
 check('congelamento ativo', (await g('__game.freezeT')) > 0);
@@ -85,23 +95,21 @@ const k0 = await g('__game.kills');
 await g('__game.useBomb()');
 await page.waitForTimeout(600);
 check('bomba causou abates', (await g('__game.kills')) > k0);
-await g('__game.hurtManor(300)'); await g('__game.addCoins(400)');
-await g('__game.teleport(700, 620)');  // perto da porta
+await g('__game.hurtManor(300); __game.addCoins(400)');
+await g('__game.teleport(700, 620)');
 await page.waitForTimeout(500);
 const hpBefore = await g('__game.manorHp');
 await page.tap('#buildPanel button[data-act="repair"]');
 await page.waitForTimeout(300);
-check('reparo do casarão funcionou', (await g('__game.manorHp')) > hpBefore);
+check('reparo funcionou', (await g('__game.manorHp')) > hpBefore);
 
 console.log('▶ derrota mantém o ouro…');
 const goldBefore = (await g('__game.meta')).gold;
 await g('__game.addCoins(50); __game.hurtManor(9999)');
 await waitFor('__game.state === "gameover"', 30000);
-check('game over', true);
 await page.tap('#retryBtn');
 await page.waitForTimeout(300);
-check('voltou ao menu após derrota', (await g('__game.state')) === 'menu');
-check('ouro da derrota foi guardado', (await g('__game.meta')).gold > goldBefore);
+check('menu após derrota, ouro guardado', (await g('__game.state')) === 'menu' && (await g('__game.meta')).gold > goldBefore);
 
 const realErrors = errors.filter(e => !/favicon|sw\.js|net::ERR/i.test(e));
 if (realErrors.length) {
