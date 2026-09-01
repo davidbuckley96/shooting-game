@@ -103,6 +103,24 @@ await page.tap('#buildPanel button[data-act="repair"]');
 await page.waitForTimeout(300);
 check('reparo funcionou', (await g('__game.manorHp')) > hpBefore);
 
+console.log('▶ pausa e abandono (anti-farm)…');
+await page.tap('#pauseBtn');
+await page.waitForTimeout(200);
+check('pausou', await g('__game.paused'));
+await page.tap('#resumeBtn');
+await page.waitForTimeout(200);
+check('retomou', !(await g('__game.paused')));
+const goldPreAband = (await g('__game.meta')).gold;
+await g('__game.addCoins(500)');
+await page.tap('#pauseBtn');
+await page.tap('#abandonBtn');
+await page.waitForTimeout(300);
+check('abandonou para o menu SEM guardar as moedas', (await g('__game.state')) === 'menu' && (await g('__game.meta')).gold === goldPreAband);
+await page.tap('#playBtn');
+await page.waitForTimeout(300);
+await g('__game.timeScale = 8; __game.skipCountdown()');
+await waitFor('__game.enemyCount > 0', 30000);
+
 console.log('▶ derrota mantém o ouro…');
 const goldBefore = (await g('__game.meta')).gold;
 await g('__game.addCoins(50); __game.hurtManor(9999)');

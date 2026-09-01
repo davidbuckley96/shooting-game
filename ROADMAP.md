@@ -192,3 +192,7 @@ Backlog aberto — priorizar com feedback de quem jogar.
   em colcheias, bordão raiz+quinta, tamborim; 8 compassos em loop, volume discreto, começa
   no primeiro toque, botão 🔊 silencia tudo); MOEDAS 6x com coroa cunhada, sombra e brilho,
   ímã de coleta ampliado (160px). 20 testes verdes. Republicado no link.
+- **2026-09-01 (11)** — v7: ajustes de escala (moedas -50%, torres -30%, inimigos -20%);
+  botão de PAUSA (⏸ canto superior esquerdo) com Retomar/Abandonar — abandonar volta ao
+  menu PERDENDO as moedas da fase (anti-farm de waves fáceis) e a pausa silencia a música.
+  23 testes verdes. Republicado no link.

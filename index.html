@@ -80,6 +80,7 @@
   <div class="pill">🏠 <span id="uiCastle">100%</span></div>
 </div>
 <button id="muteBtn" title="Som">🔊</button>
+<button id="pauseBtn" class="hidden" title="Pausa" style="position:fixed;top:calc(8px + env(safe-area-inset-top));left:10px;z-index:6;background:rgba(20,30,20,.72);color:#fff;border:none;border-radius:999px;width:34px;height:34px;font-size:15px">⏸</button>
 <div id="hint" class="hidden"></div>
 <div id="buildPanel" class="hidden"></div>
 <button id="nightBtn" class="hidden">⚔️ Iniciar Nível 1</button>
@@ -103,6 +104,13 @@
   <p style="opacity:.8">O equipamento do rei e tudo que ele carrega</p>
   <div id="invList" style="display:flex;flex-direction:column;gap:8px;width:min(92vw,400px)"></div>
   <button id="invCloseBtn" class="big" style="margin-top:10px">✔ Fechar</button>
+</div>
+
+<div id="pauseOv" class="overlay center hidden">
+  <h1>⏸ Pausa</h1>
+  <button id="resumeBtn" class="big">▶ Retomar</button>
+  <p style="opacity:.85">Abandonar perde as moedas coletadas nesta fase.</p>
+  <button id="abandonBtn" class="big" style="background:linear-gradient(#e05a4a,#b03424);color:#fff;box-shadow:0 5px 0 #7a1f14">🏳️ Abandonar</button>
 </div>
 
 <div id="levelEnd" class="overlay center hidden">

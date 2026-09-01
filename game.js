@@ -186,6 +186,7 @@ const DOOR = { x: 700, y: 672 };
 
 let state = 'menu';        // menu | play | levelend | gameover
 let waveNum = 0, waveTotal = 4, waveTimer = 0, wavePhase = 'countdown';
+let paused = false;
 let freezeT = 0;
 let level = 1;
 let coins = 80;
@@ -246,7 +247,7 @@ const levelDir = (n) => LEVEL_DIRS[(n - 1) % LEVEL_DIRS.length];
 
 // construções livres: o jogador ergue torres/lama onde o rei estiver
 let builds = [];
-const BUILD_GAP = 150;      // distância mínima entre construções
+const BUILD_GAP = 115;      // distância mínima entre construções
 const LANE_CLEAR = 75;      // não pode construir em cima da lane
 function distToPath(x, y) {
   const path = levelDir(level).path;
@@ -355,6 +356,16 @@ $('menuBtn').addEventListener('click', () => { audioCtx(); showMenu(); });
 waveBtn.addEventListener('click', () => { if (state === 'play' && wavePhase === 'countdown') waveTimer = 0; });
 $('bombBtn').addEventListener('click', () => { audioCtx(); useBomb(); });
 $('freezeBtn').addEventListener('click', () => { audioCtx(); useFreeze(); });
+const pauseOv = $('pauseOv'), pauseBtn = $('pauseBtn');
+pauseBtn.addEventListener('click', () => { if (state === 'play') { paused = true; pauseOv.classList.remove('hidden'); if (musicGain) musicGain.gain.value = 0; } });
+$('resumeBtn').addEventListener('click', () => { paused = false; pauseOv.classList.add('hidden'); if (musicGain) musicGain.gain.value = muted ? 0 : 1; });
+$('abandonBtn').addEventListener('click', () => {
+  // abandonar = perder as moedas coletadas nesta fase (anti-farm)
+  paused = false; pauseOv.classList.add('hidden');
+  if (musicGain) musicGain.gain.value = muted ? 0 : 1;
+  coins = 0;
+  showMenu();
+});
 const invEl = $('inventory'), invList = $('invList');
 $('invBtn').addEventListener('click', () => { audioCtx(); renderInventory(); menuEl.classList.add('hidden'); invEl.classList.remove('hidden'); });
 $('invCloseBtn').addEventListener('click', () => { invEl.classList.add('hidden'); menuEl.classList.remove('hidden'); });
@@ -460,7 +471,7 @@ function resetGame() {
 function startLevel() {
   level = meta.mission;
   resetGame();
-  state = 'play';
+  state = 'play'; paused = false;
   wavePhase = 'countdown'; waveTimer = 8; waveNum = 0;
   waveTotal = 4 + (level >= 4 ? 1 : 0);
   menuEl.classList.add('hidden'); overEl.classList.add('hidden'); levelEndEl.classList.add('hidden');
@@ -575,7 +586,7 @@ function makeEnemy(type, n, px, py) {
   }
   const e = {
     type, x: sx, y: sy,
-    r: b.r, s: b.s, spd: b.spd, dmg: Math.round(b.dmg * (1 + 0.08 * (n - 1))),
+    r: Math.round(b.r * 0.8), s: b.s * 0.8, spd: b.spd, dmg: Math.round(b.dmg * (1 + 0.08 * (n - 1))),
     hp: Math.round(b.hp * lvlMult(n)), coin: b.coin,
     armadura: b.armadura || 1, alcance: b.alcance || 0, cura: b.cura || false,
     divideEm: b.divideEm || null, nivel: n,
@@ -862,7 +873,7 @@ function update(dt) {
     const e = nearestEnemy(p.x, p.y, st.range);
     if (e) {
       p.cd = st.rate;
-      bolts.push({ x: p.x, y: p.y - 160, target: e, tx: e.x, ty: e.y, spd: 480, dmg: st.dmg, t: 0 });
+      bolts.push({ x: p.x, y: p.y - 112, target: e, tx: e.x, ty: e.y, spd: 480, dmg: st.dmg, t: 0 });
       beep(680 + p.level * 90, .05, 'square', .06, -250);
     }
   }
@@ -1049,7 +1060,8 @@ function updateUI(dt) {
   uiCoins.textContent = coins;
   uiManor.textContent = Math.max(0, Math.round(MANOR.hp / MANOR.maxHp * 100)) + '%';
   uiLevel.textContent = `${level} · W${Math.max(waveNum, 1)}/${waveTotal}`;
-  const showBtn = state === 'play' && wavePhase === 'countdown';
+  pauseBtn.classList.toggle('hidden', state !== 'play');
+  const showBtn = state === 'play' && wavePhase === 'countdown' && !paused;
   waveBtn.classList.toggle('hidden', !showBtn);
   if (showBtn) waveBtn.textContent = `⏩ Wave ${waveNum + 1}/${waveTotal} em ${Math.ceil(waveTimer)}s (${levelDir(level).nome}) — pular`;
   renderConsumables();
@@ -1086,7 +1098,7 @@ function drawRock(g, r0) {
   g.beginPath(); g.moveTo(x - 7 * s, y - 9 * s); g.lineTo(x + 6 * s, y - 10 * s); g.lineTo(x + 3 * s, y - 2 * s); g.closePath(); g.fill();
 }
 function drawTower(g, x, y, lvl) {
-  const s = 3 * (1 + 0.12 * (lvl - 1));
+  const s = 2.1 * (1 + 0.12 * (lvl - 1));
   contact(g, x, y + 30 * s, 36 * s, 13 * s, .45);
   const W = 46 * s, H = 64 * s;
   g.fillStyle = '#6f767d';
@@ -1409,21 +1421,21 @@ function render() {
   ctx.save();
   ctx.translate(ox, oy);
   ctx.drawImage(worldC, 0, 0);
-  // moedas no chão (6x, com coroa cunhada)
+  // moedas no chão (com coroa cunhada)
   for (const c of coinDrops) {
-    contact(ctx, c.x, c.y + 30, 34, 12, .3);
-    const gm = ctx.createRadialGradient(c.x - 12, c.y - 12, 4, c.x, c.y, 46);
+    contact(ctx, c.x, c.y + 15, 17, 6, .3);
+    const gm = ctx.createRadialGradient(c.x - 6, c.y - 6, 2, c.x, c.y, 23);
     gm.addColorStop(0, '#ffe082'); gm.addColorStop(.6, '#f2c14e'); gm.addColorStop(1, '#c8901a');
-    ctx.fillStyle = gm; ctx.beginPath(); ctx.arc(c.x, c.y, 40, 0, TAU); ctx.fill();
-    ctx.strokeStyle = 'rgba(150,100,10,.75)'; ctx.lineWidth = 7;
-    ctx.beginPath(); ctx.arc(c.x, c.y, 27, 0, TAU); ctx.stroke();
+    ctx.fillStyle = gm; ctx.beginPath(); ctx.arc(c.x, c.y, 20, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(150,100,10,.75)'; ctx.lineWidth = 3.5;
+    ctx.beginPath(); ctx.arc(c.x, c.y, 13.5, 0, TAU); ctx.stroke();
     ctx.fillStyle = '#a8701a';
     ctx.beginPath();
-    ctx.moveTo(c.x - 14, c.y + 12); ctx.lineTo(c.x - 14, c.y - 6); ctx.lineTo(c.x - 6, c.y + 3);
-    ctx.lineTo(c.x, c.y - 10); ctx.lineTo(c.x + 6, c.y + 3); ctx.lineTo(c.x + 14, c.y - 6); ctx.lineTo(c.x + 14, c.y + 12);
+    ctx.moveTo(c.x - 7, c.y + 6); ctx.lineTo(c.x - 7, c.y - 3); ctx.lineTo(c.x - 3, c.y + 1.5);
+    ctx.lineTo(c.x, c.y - 5); ctx.lineTo(c.x + 3, c.y + 1.5); ctx.lineTo(c.x + 7, c.y - 3); ctx.lineTo(c.x + 7, c.y + 6);
     ctx.closePath(); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,.65)';
-    ctx.beginPath(); ctx.ellipse(c.x - 14, c.y - 17, 12, 6, -0.6, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(c.x - 7, c.y - 8.5, 6, 3, -0.6, 0, TAU); ctx.fill();
   }
   // seta da direção do próximo nível (fase de preparação)
   if (state === 'play' && wavePhase === 'countdown') {
@@ -1521,7 +1533,7 @@ let last = performance.now();
 function frame(now) {
   let dt = Math.min((now - last) / 1000, 0.05) * timeScale;
   last = now;
-  if (state === 'play') {
+  if (state === 'play' && !paused) {
     const steps = Math.max(1, Math.ceil(dt / 0.033));
     const h = dt / steps;
     for (let i = 0; i < steps; i++) {
@@ -1557,6 +1569,7 @@ window.__game = {
   get wave() { return { num: waveNum, total: waveTotal, phase: wavePhase, timer: waveTimer }; },
   get meta() { return JSON.parse(JSON.stringify(meta)); },
   get freezeT() { return freezeT; },
+  get paused() { return paused; },
   get inventoryOpen() { return !invEl.classList.contains('hidden'); },
   get itemCount() { return Object.keys(ITEMS).length; },
   get spritesReady() { return spritesReady; },
