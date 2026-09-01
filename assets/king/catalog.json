@@ -34,7 +34,8 @@
       706
      ]
     }
-   ]
+   ],
+   "nota": "corrigida por espelhamento -> corre-costas-b"
   },
   "corre-frente-a": {
    "ok": true,
@@ -230,6 +231,39 @@
       11,
       724,
       710
+     ]
+    }
+   ]
+  },
+  "corre-costas-b": {
+   "ok": true,
+   "tira": "tira-1 (ESPELHADA para corrigir a mão da espada)",
+   "frames": [
+    {
+     "file": "corre-costas-b-1.png",
+     "bbox": [
+      0,
+      0,
+      724,
+      705
+     ]
+    },
+    {
+     "file": "corre-costas-b-2.png",
+     "bbox": [
+      6,
+      0,
+      719,
+      713
+     ]
+    },
+    {
+     "file": "corre-costas-b-3.png",
+     "bbox": [
+      32,
+      0,
+      723,
+      706
      ]
     }
    ]
