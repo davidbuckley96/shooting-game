@@ -180,3 +180,11 @@ Backlog aberto — priorizar com feedback de quem jogar.
   o nível (só muda entre níveis); INVENTÁRIO no menu com registro de itens expansível
   (Equipado: Espada Real/Escudo da Coroa · Mochila: consumíveis e desbloqueios · Em breve:
   Arco Real 🔒 e Poder Real 🔒). 20 testes verdes. Republicado no link.
+- **2026-09-01 (9)** — v5 (feedback do David): CURVA DE DIFICULDADE real (multiplicador de
+  vida quadrático por nível + orçamento de pontos por wave; cada nível ESTREIA um tipo);
+  economia enxuta (mais inimigos, menos ouro por abate); BESTIÁRIO com 6 tipos + chefão:
+  Soldado, Assassino (rápido/dói/frágil), Atirador (lanças à distância no rei/casarão),
+  Blindado (60% resistente a virotes), Xamã (cura aliados), GIGANTE (divide em 4 médios ->
+  cada um em 4 minis; 16 no total); escala visual: inimigos 5x, torres 3x, projéteis 5x com
+  penas e brilho, casarão 2x (3x literal não cabe no mapa 1400px — expandir mundo se o David
+  quiser mais); golpe do rei ESPELHADO quando vira à esquerda; zoom 0.5. 20 testes verdes.

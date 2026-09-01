@@ -107,11 +107,11 @@ const KING_IDLE = 'corre-frente-b-2';
 
 // ---------------- Mundo & estado ----------------
 const WORLD = { w: 1400, h: 1400 };
-const ZOOM = 0.6;               // câmera afastada: visão tática p/ kiting
+const ZOOM = 0.5;               // câmera afastada: visão tática p/ kiting
 const vieww = () => VW / ZOOM;
 const viewh = () => VH / ZOOM;
-const MANOR = { x: 700, y: 420, hp: 400, maxHp: 400 };
-const DOOR = { x: 700, y: 545 };
+const MANOR = { x: 700, y: 600, hp: 400, maxHp: 400 };
+const DOOR = { x: 700, y: 672 };
 
 let state = 'menu';        // menu | play | levelend | gameover
 let waveNum = 0, waveTotal = 4, waveTimer = 0, wavePhase = 'countdown';
@@ -164,19 +164,19 @@ const cam = { x: 700, y: 640 };
 
 // direções de ataque por nível (de onde a horda vem)
 const LEVEL_DIRS = [
-  { key: 'S',  nome: 'SUL ⬇️',       path: [[700, 1370], [680, 1040], [724, 780], [700, 545]] },
-  { key: 'O',  nome: 'OESTE ⬅️',     path: [[30, 800], [330, 770], [530, 650], [700, 545]] },
-  { key: 'L',  nome: 'LESTE ➡️',     path: [[1370, 800], [1070, 770], [870, 650], [700, 545]] },
-  { key: 'SO', nome: 'SUDOESTE ↙️',  path: [[170, 1370], [380, 1050], [570, 800], [700, 545]] },
-  { key: 'SL', nome: 'SUDESTE ↘️',   path: [[1230, 1370], [1020, 1050], [830, 800], [700, 545]] },
-  { key: 'N',  nome: 'NORTE ⬆️',     path: [[700, 30], [1030, 200], [1090, 560], [860, 740], [700, 545]] },
+  { key: 'S',  nome: 'SUL ⬇️',       path: [[700, 1370], [680, 1060], [712, 860], [700, 700]] },
+  { key: 'O',  nome: 'OESTE ⬅️',     path: [[30, 830], [300, 805], [520, 765], [700, 700]] },
+  { key: 'L',  nome: 'LESTE ➡️',     path: [[1370, 830], [1100, 805], [880, 765], [700, 700]] },
+  { key: 'SO', nome: 'SUDOESTE ↙️',  path: [[170, 1370], [380, 1070], [560, 880], [700, 700]] },
+  { key: 'SL', nome: 'SUDESTE ↘️',   path: [[1230, 1370], [1020, 1070], [840, 880], [700, 700]] },
+  { key: 'N',  nome: 'NORTE ⬆️',     path: [[700, 30], [1130, 250], [1160, 660], [920, 830], [700, 700]] },
 ];
 const levelDir = (n) => LEVEL_DIRS[(n - 1) % LEVEL_DIRS.length];
 
 // construções livres: o jogador ergue torres/lama onde o rei estiver
 let builds = [];
-const BUILD_GAP = 85;       // distância mínima entre construções
-const LANE_CLEAR = 60;      // não pode construir em cima da lane
+const BUILD_GAP = 150;      // distância mínima entre construções
+const LANE_CLEAR = 75;      // não pode construir em cima da lane
 function distToPath(x, y) {
   const path = levelDir(level).path;
   let best = Infinity;
@@ -190,7 +190,7 @@ function distToPath(x, y) {
 }
 function placeBlockReason(x, y) {
   if (x < 60 || y < 60 || x > WORLD.w - 60 || y > WORLD.h - 60) return 'longe da borda';
-  if (dist(x, y, MANOR.x, MANOR.y) < 160) return 'longe do casarão';
+  if (dist(x, y, MANOR.x, MANOR.y) < 320) return 'longe do casarão';
   if (distToPath(x, y) < LANE_CLEAR) return 'fora da estrada';
   for (const b of builds) if (dist(x, y, b.x, b.y) < BUILD_GAP) return 'longe de outra construção';
   return null;
@@ -219,14 +219,14 @@ const decor = { pines: [], rocks: [], flowers: [] };
 })();
 
 // entidades dinâmicas
-let enemies = [], bolts = [], coinDrops = [], parts = [], floats = [];
+let enemies = [], bolts = [], eshots = [], coinDrops = [], parts = [], floats = [];
 let wavePlan = { queue: [], t: 0 };
 
 // ---------------- Torres ----------------
 const TOWER = {
   cost: 60,
   upCost: lvl => [0, 90, 140][lvl] || 999,
-  stats: lvl => ({ dmg: 14 + 10 * (lvl - 1), rate: 0.72 - 0.1 * (lvl - 1), range: 235 + 35 * (lvl - 1) }),
+  stats: lvl => ({ dmg: 14 + 10 * (lvl - 1), rate: 0.72 - 0.1 * (lvl - 1), range: 260 + 40 * (lvl - 1) }),
 };
 
 // ---------------- Entrada: joystick + teclado ----------------
@@ -378,7 +378,7 @@ function resetGame() {
   king.dead = false; king.respawn = 0; king.cd = 0; king.attackT = 0; king.dirKey = 'frente';
   builds = [];
   freezeT = 0;
-  enemies = []; bolts = []; coinDrops = []; parts = []; floats = [];
+  enemies = []; bolts = []; eshots = []; coinDrops = []; parts = []; floats = [];
   wavePlan = { queue: [], t: 0 };
   shake = 0;
   cam.x = 700; cam.y = 660;
@@ -437,37 +437,79 @@ function showMenu() {
 }
 
 // ---------------- Waves ----------------
+// multiplicador de vida por nível: cresce cada vez mais rápido
+const lvlMult = n => 1 + 0.30 * (n - 1) + 0.06 * (n - 1) * (n - 1);
+// bestiário: stats base (vida escala com lvlMult; ouro é ESCASSO de propósito)
+const BESTIARY = {
+  soldado:  { r: 30, s: 5,    hp: 30,  spd: 66,  dmg: 9,  coin: 2, custo: 2 },
+  assassino:{ r: 26, s: 4.2,  hp: 16,  spd: 132, dmg: 20, coin: 2, custo: 2 },
+  atirador: { r: 30, s: 5,    hp: 26,  spd: 55,  dmg: 8,  coin: 3, custo: 3, alcance: 340 },
+  blindado: { r: 34, s: 5.6,  hp: 95,  spd: 40,  dmg: 12, coin: 4, custo: 4, armadura: 0.4 },
+  xama:     { r: 30, s: 5.2,  hp: 42,  spd: 50,  dmg: 4,  coin: 5, custo: 5, cura: true },
+  gigante:  { r: 62, s: 11,   hp: 300, spd: 32,  dmg: 30, coin: 8, custo: 10, divideEm: 'medio' },
+  medio:    { r: 32, s: 5.5,  hp: 55,  spd: 62,  dmg: 12, coin: 2, divideEm: 'mini' },
+  mini:     { r: 18, s: 3,    hp: 16,  spd: 96,  dmg: 5,  coin: 1 },
+  chefe:    { r: 78, s: 14,   hp: 750, spd: 36,  dmg: 40, coin: 60 },
+};
+// cada nível ESTREIA um tipo novo (o jogador sente a diferença)
+function tiposDoNivel(n) {
+  const t = ['soldado'];
+  if (n >= 2) t.push('assassino');
+  if (n >= 3) t.push('atirador');
+  if (n >= 4) t.push('blindado');
+  if (n >= 5) t.push('gigante');
+  if (n >= 6) t.push('xama');
+  return t;
+}
 function buildWavePlan(n, w) {
-  const força = n + w;                      // dificuldade cresce por nível E por wave
+  // orçamento em pontos: mais inimigos, escalada real entre níveis
+  let pontos = Math.round((9 + 3.5 * w) * (1 + 0.28 * (n - 1)));
+  const tipos = tiposDoNivel(n);
+  const novato = tipos[tipos.length - 1]; // tipo que estreia neste nível
   const pool = [];
-  const soldiers = 3 + Math.ceil(força * 1.7);
-  const fasts = força >= 4 ? Math.ceil(força / 3) : 0;
-  const brutes = w >= 3 ? Math.floor(força / 4) : 0;
-  for (let i = 0; i < soldiers; i++) pool.push('soldado');
-  for (let i = 0; i < fasts; i++) pool.push('rapido');
-  for (let i = 0; i < brutes; i++) pool.push('bruto');
+  // garante presença do tipo novo a partir da wave 2
+  if (w >= 2 && novato !== 'soldado') {
+    const c = BESTIARY[novato].custo;
+    const qtd = Math.max(1, Math.floor(pontos * 0.25 / c));
+    for (let i = 0; i < qtd; i++) { pool.push(novato); pontos -= c; }
+  }
+  // wave 1 é a mais leve: sem unidades pesadas (custo 10+)
+  const sorteaveis = w === 1 ? tipos.filter(t => (BESTIARY[t].custo || 2) < 10) : tipos;
+  let guard = 0;
+  while (pontos > 0 && guard++ < 200) {
+    const t = sorteaveis[randi(0, sorteaveis.length - 1)];
+    const c = BESTIARY[t].custo || 2;
+    if (c > pontos && pontos >= 2) continue;
+    pool.push(t); pontos -= c;
+  }
   for (let i = pool.length - 1; i > 0; i--) { const j = randi(0, i); [pool[i], pool[j]] = [pool[j], pool[i]]; }
   const evts = [];
   let t = 0.8;
   while (pool.length) {
     evts.push({ t, types: pool.splice(0, randi(3, 5)) });
-    t += Math.max(0.8, rand(1.3, 1.9) - força * 0.03);
+    t += Math.max(0.7, rand(1.2, 1.8) - (n + w) * 0.03);
   }
-  if (w === waveTotal && n >= 2) evts.push({ t: t + 1.5, types: ['chefe'] });
+  if (w === waveTotal && n >= 3) evts.push({ t: t + 1.5, types: Array(Math.max(1, Math.floor(n / 4))).fill('chefe') });
   wavePlan = { queue: evts, t: 0 };
 }
-function makeEnemy(type, n) {
-  const path = levelDir(n).path;
-  const [sx, sy] = path[0];
+function makeEnemy(type, n, px, py) {
+  const b = BESTIARY[type] || BESTIARY.soldado;
+  let sx, sy;
+  if (px !== undefined) { sx = px; sy = py; }
+  else {
+    const path = levelDir(n).path;
+    sx = path[0][0] + rand(-50, 50); sy = path[0][1] + rand(-50, 50);
+  }
   const e = {
-    type, x: sx + rand(-50, 50), y: sy + rand(-50, 50),
-    wp: 1, cd: rand(0, .6), bob: rand(0, TAU), face: 1, atDoor: false,
+    type, x: sx, y: sy,
+    r: b.r, s: b.s, spd: b.spd, dmg: Math.round(b.dmg * (1 + 0.08 * (n - 1))),
+    hp: Math.round(b.hp * lvlMult(n)), coin: b.coin,
+    armadura: b.armadura || 1, alcance: b.alcance || 0, cura: b.cura || false,
+    divideEm: b.divideEm || null, nivel: n,
+    wp: 1, cd: rand(0, .6), curaCd: rand(0, 1), bob: rand(0, TAU), face: 1, atDoor: false,
   };
-  if (type === 'rapido')      { e.r = 12; e.s = .85; e.hp = 16 + 4 * n; e.spd = 108; e.dmg = 5 + n; e.coin = 4; }
-  else if (type === 'bruto')  { e.r = 20; e.s = 1.45; e.hp = 90 + 18 * n; e.spd = 46; e.dmg = 16 + 2 * n; e.coin = 12; }
-  else if (type === 'chefe')  { e.r = 30; e.s = 2.2; e.hp = 500 + 150 * n; e.spd = 40; e.dmg = 30 + 3 * n; e.coin = 100; sfx.boss(); showHint('⚠️ CHEFÃO à vista!', 3); }
-  else                        { e.r = 14; e.s = 1; e.hp = 26 + 6 * n; e.spd = 66; e.dmg = 8 + n; e.coin = 5; }
   e.maxHp = e.hp;
+  if (type === 'chefe') { sfx.boss(); showHint('⚠️ CHEFÃO à vista!', 3); }
   return e;
 }
 
@@ -567,7 +609,7 @@ function update(dt) {
     king.respawn -= dt;
     if (king.respawn <= 0) {
       king.dead = false; king.hp = king.maxHp;
-      king.x = DOOR.x; king.y = DOOR.y + 70;
+      king.x = DOOR.x; king.y = DOOR.y + 90;
       addParts(king.x, king.y, '#ffd23e', 16, 120, 0.6, 3);
     }
   } else {
@@ -641,9 +683,19 @@ function update(dt) {
     if (e.hp <= 0) {
       stats.kills++;
       dropCoins(e.x, e.y, e.coin);
-      addParts(e.x, e.y, '#c62818', e.type === 'chefe' ? 30 : 10, 130, 0.6, 3);
+      addParts(e.x, e.y, '#c62818', e.s > 8 ? 34 : 10, 130, 0.6, 3);
       sfx.die();
       enemies.splice(i, 1);
+      if (e.divideEm) {
+        // o tanque se parte em 4 pedaços que continuam a marcha
+        for (let k = 0; k < 4; k++) {
+          const a = k / 4 * TAU + rand(-.3, .3);
+          const filho = makeEnemy(e.divideEm, e.nivel, e.x + Math.cos(a) * (e.r * .8), e.y + Math.sin(a) * (e.r * .8));
+          filho.wp = e.wp; filho.atDoor = e.atDoor;
+          enemies.push(filho);
+        }
+        addFloat(e.x, e.y - 30, '💥 dividiu!', '#ffb0a0');
+      }
       continue;
     }
     e.bob += dt * 11; e.cd -= dt;
@@ -652,6 +704,34 @@ function update(dt) {
     if (freezeT > 0) spd *= 0.3;
     for (const b of builds) {
       if (b.kind === 'mud' && dist2(e.x, e.y, b.x, b.y) < 115 * 115) { spd *= 0.45; break; }
+    }
+    // xamã: cura aliados próximos
+    if (e.cura) {
+      e.curaCd -= dt;
+      if (e.curaCd <= 0) {
+        e.curaCd = 2.2;
+        for (const al of enemies) {
+          if (al !== e && al.hp > 0 && al.hp < al.maxHp && dist2(e.x, e.y, al.x, al.y) < 190 * 190) {
+            al.hp = Math.min(al.maxHp, al.hp + 8 + 2 * e.nivel);
+            addParts(al.x, al.y - 20, '#7fe088', 4, 60, 0.4, 3);
+          }
+        }
+      }
+    }
+    // atirador: para e dispara lanças no rei ou no casarão
+    if (e.alcance) {
+      let tx = null, ty = null, alvo = null;
+      if (!king.dead && dist2(e.x, e.y, king.x, king.y) < e.alcance * e.alcance) { tx = king.x; ty = king.y; alvo = 'rei'; }
+      else if (dist2(e.x, e.y, DOOR.x, DOOR.y) < (e.alcance + 60) * (e.alcance + 60)) { tx = DOOR.x; ty = DOOR.y - 40; alvo = 'casarao'; }
+      if (alvo) {
+        e.face = tx > e.x ? 1 : -1;
+        if (e.cd <= 0) {
+          e.cd = 1.7;
+          eshots.push({ x: e.x, y: e.y - 20, tx, ty, alvo, spd: 330, dmg: e.dmg, t: 0 });
+          beep(240, .06, 'square', .07, -80);
+        }
+        continue; // parado atirando
+      }
     }
     // rei por perto? PERSEGUE (nada de apanhar de graça à distância)
     if (!king.dead) {
@@ -709,7 +789,7 @@ function update(dt) {
     const e = nearestEnemy(p.x, p.y, st.range);
     if (e) {
       p.cd = st.rate;
-      bolts.push({ x: p.x, y: p.y - 78, target: e, tx: e.x, ty: e.y, spd: 480, dmg: st.dmg, t: 0 });
+      bolts.push({ x: p.x, y: p.y - 160, target: e, tx: e.x, ty: e.y, spd: 480, dmg: st.dmg, t: 0 });
       beep(680 + p.level * 90, .05, 'square', .06, -250);
     }
   }
@@ -723,7 +803,7 @@ function update(dt) {
     const hitR = (b.target && b.target.hp > 0) ? b.target.r : 6;
     if (d <= Math.max(hitR, b.spd * dt) || b.t > 3) {
       if (b.target && b.target.hp > 0 && d < hitR + 16) {
-        b.target.hp -= b.dmg;
+        b.target.hp -= Math.round(b.dmg * (b.target.armadura || 1));
         addFloat(b.target.x, b.target.y - b.target.r - 10, String(b.dmg), '#ffe9a8');
         addParts(b.target.x, b.target.y, '#fff', 3, 80, 0.2, 1.5);
         sfx.hit();
@@ -733,6 +813,33 @@ function update(dt) {
     }
     b.x += (b.tx - b.x) / d * b.spd * dt;
     b.y += (b.ty - b.y) / d * b.spd * dt;
+  }
+
+  // --- lanças dos atiradores ---
+  for (let i = eshots.length - 1; i >= 0; i--) {
+    const s2 = eshots[i];
+    s2.t += dt;
+    const d = dist(s2.x, s2.y, s2.tx, s2.ty);
+    if (d <= Math.max(14, s2.spd * dt) || s2.t > 3) {
+      if (s2.alvo === 'rei' && !king.dead && dist(s2.tx, s2.ty, king.x, king.y) < 46) {
+        king.hp -= s2.dmg;
+        addParts(king.x, king.y - 20, '#ff7043', 5, 90, 0.3, 2);
+        sfx.hurt();
+        if (king.hp <= 0 && !king.dead) {
+          king.dead = true; king.respawn = 5;
+          addParts(king.x, king.y, '#ffd23e', 22, 150, 0.8, 3);
+          showHint('👑 O rei caiu! Voltando ao casarão…', 3);
+        }
+      } else if (s2.alvo === 'casarao' && dist(s2.tx, s2.ty, DOOR.x, DOOR.y - 40) < 90) {
+        MANOR.hp -= s2.dmg;
+        addParts(s2.tx, s2.ty, '#ff7043', 5, 90, 0.3, 2.5);
+        shake = Math.max(shake, 4);
+      }
+      eshots.splice(i, 1);
+      continue;
+    }
+    s2.x += (s2.tx - s2.x) / d * s2.spd * dt;
+    s2.y += (s2.ty - s2.y) / d * s2.spd * dt;
   }
 
   // --- moedas ---
@@ -802,7 +909,7 @@ function refreshPanel() {
     return;
   }
   // perto da porta do casarão: reparo (se comprado)
-  const nearDoor = dist(king.x, king.y, DOOR.x, DOOR.y) < 120;
+  const nearDoor = dist(king.x, king.y, DOOR.x, DOOR.y) < 200;
   const missing = MANOR.maxHp - MANOR.hp;
   if (nearDoor && meta.repair && missing >= 1) {
     const cost = Math.ceil(missing * 0.5);
@@ -906,7 +1013,7 @@ function drawRock(g, r0) {
   g.beginPath(); g.moveTo(x - 7 * s, y - 9 * s); g.lineTo(x + 6 * s, y - 10 * s); g.lineTo(x + 3 * s, y - 2 * s); g.closePath(); g.fill();
 }
 function drawTower(g, x, y, lvl) {
-  const s = 1 + 0.14 * (lvl - 1);
+  const s = 3 * (1 + 0.12 * (lvl - 1));
   contact(g, x, y + 30 * s, 36 * s, 13 * s, .45);
   const W = 46 * s, H = 64 * s;
   g.fillStyle = '#6f767d';
@@ -955,6 +1062,12 @@ function drawTower(g, x, y, lvl) {
   g.restore();
 }
 function drawManor(g) {
+  const px = MANOR.x, py = MANOR.y + 67;   // pivô: base do casarão
+  g.save(); g.translate(px, py); g.scale(2, 2); g.translate(-px, -py);
+  drawManorBase(g);
+  g.restore();
+}
+function drawManorBase(g) {
   const x = MANOR.x, y = MANOR.y, s = 1.15;
   contact(g, x + 6, y + 62 * s, 95 * s, 26 * s, .45);
   const W = 120 * s, H = 68 * s;
@@ -1029,31 +1142,85 @@ function drawManor(g) {
   g.fillStyle = '#f5f8ff';
   g.beginPath(); g.moveTo(fx + 8, fy - 30); g.lineTo(fx + 8, fy - 38); g.lineTo(fx + 11.5, fy - 33.5); g.lineTo(fx + 14, fy - 39); g.lineTo(fx + 16.5, fy - 33.5); g.lineTo(fx + 20, fy - 38); g.lineTo(fx + 20, fy - 30); g.closePath(); g.fill();
 }
+const EPAL = {
+  soldado:   ['#e86048', '#c62818', '#8a1408', '#a01c0e', '#ffdd55'],
+  assassino: ['#f2a052', '#e67e22', '#a04a08', '#b85e10', '#fff2c0'],
+  atirador:  ['#a678d8', '#7a4ac2', '#4a2a80', '#5c3a9e', '#ffdd55'],
+  blindado:  ['#8a97a8', '#5e6c80', '#3a4452', '#4a5668', '#ffdd55'],
+  xama:      ['#8fd08a', '#4a9e50', '#2a6b32', '#3a8040', '#f5f8ff'],
+  gigante:   ['#e8a048', '#c87828', '#8a4a12', '#a05e1a', '#ffdd55'],
+  medio:     ['#e8a048', '#c87828', '#8a4a12', '#a05e1a', '#ffdd55'],
+  mini:      ['#e8a048', '#c87828', '#8a4a12', '#a05e1a', '#ffdd55'],
+  chefe:     ['#8a5ad8', '#6b3f8f', '#3a1e58', '#4a1408', '#ff4444'],
+};
 function drawEnemy(g, e) {
   const s = e.s, x = e.x, y = e.y + Math.sin(e.bob) * 2;
+  const P = EPAL[e.type] || EPAL.soldado;
   contact(g, e.x, e.y + 9 * s, 10 * s, 4 * s, .4);
   g.save();
-  g.translate(x, y); g.scale(e.face, 1); g.translate(-x, -y);
+  g.translate(x, y); g.scale(e.face * (e.type === 'assassino' ? .82 : 1), 1); g.translate(-x, -y);
+  // corpo
   const grd = g.createRadialGradient(x - 3 * s, y - 5 * s, 2, x, y, 12 * s);
-  grd.addColorStop(0, '#e86048'); grd.addColorStop(.55, '#c62818'); grd.addColorStop(1, '#8a1408');
+  grd.addColorStop(0, P[0]); grd.addColorStop(.55, P[1]); grd.addColorStop(1, P[2]);
   g.fillStyle = grd;
   g.beginPath(); g.moveTo(x - 9 * s, y + 8 * s); g.quadraticCurveTo(x - 11 * s, y - 10 * s, x, y - 11 * s); g.quadraticCurveTo(x + 11 * s, y - 10 * s, x + 9 * s, y + 8 * s); g.quadraticCurveTo(x, y + 11 * s, x - 9 * s, y + 8 * s); g.closePath(); g.fill();
-  g.fillStyle = e.type === 'chefe' ? '#4a1408' : '#a01c0e';
+  // barriga dos ogros (família do gigante)
+  if (e.divideEm || e.type === 'mini') {
+    g.fillStyle = 'rgba(255,230,180,.5)';
+    g.beginPath(); g.ellipse(x, y + 3 * s, 6 * s, 5 * s, 0, 0, TAU); g.fill();
+  }
+  // elmo / capuz
+  g.fillStyle = P[3];
   g.beginPath(); g.arc(x, y - 6 * s, 7.5 * s, Math.PI, 0); g.fill();
-  g.fillStyle = '#e86048'; g.beginPath(); g.arc(x, y - 12.5 * s, 1.8 * s, 0, TAU); g.fill();
-  g.fillStyle = '#3a0e06'; g.beginPath(); g.roundRect(x - 5 * s, y - 6 * s, 10 * s, 4 * s, 2 * s); g.fill();
-  g.fillStyle = e.type === 'chefe' ? '#ff4444' : '#ffdd55';
+  if (e.type !== 'xama') { g.fillStyle = P[0]; g.beginPath(); g.arc(x, y - 12.5 * s, 1.8 * s, 0, TAU); g.fill(); }
+  // visor / olhos
+  g.fillStyle = '#2a1206';
+  g.beginPath(); g.roundRect(x - 5 * s, y - 6 * s, 10 * s, 4 * s, 2 * s); g.fill();
+  g.fillStyle = P[4];
   g.beginPath(); g.arc(x - 2.2 * s, y - 4 * s, 1.1 * s, 0, TAU); g.arc(x + 2.2 * s, y - 4 * s, 1.1 * s, 0, TAU); g.fill();
-  g.strokeStyle = '#d8dce0'; g.lineWidth = 2.2 * s; g.lineCap = 'round';
-  g.beginPath(); g.moveTo(x + 9 * s, y + 2 * s); g.lineTo(x + 15 * s, y - 8 * s); g.stroke();
-  g.strokeStyle = '#7a5228'; g.lineWidth = 2.6 * s;
-  g.beginPath(); g.moveTo(x + 8 * s, y + 4 * s); g.lineTo(x + 10.5 * s, y); g.stroke();
+  // adornos por tipo
+  if (e.type === 'atirador') {
+    g.strokeStyle = '#5a3a1a'; g.lineWidth = 1.8 * s;
+    g.beginPath(); g.arc(x + 10 * s, y - 2 * s, 7 * s, -1.2, 1.2); g.stroke();
+    g.strokeStyle = '#e8dcc0'; g.lineWidth = .8 * s;
+    g.beginPath(); g.moveTo(x + 12.5 * s, y - 8.5 * s); g.lineTo(x + 6 * s, y - 2 * s); g.lineTo(x + 12.5 * s, y + 4.5 * s); g.stroke();
+  } else if (e.type === 'xama') {
+    g.strokeStyle = '#6b4a2b'; g.lineWidth = 1.6 * s;
+    g.beginPath(); g.moveTo(x + 9 * s, y + 6 * s); g.lineTo(x + 12 * s, y - 12 * s); g.stroke();
+    g.fillStyle = '#7fe088';
+    g.beginPath(); g.arc(x + 12.4 * s, y - 13 * s, 2.4 * s, 0, TAU); g.fill();
+  } else if (e.type === 'blindado') {
+    g.fillStyle = 'rgba(220,228,236,.85)';
+    g.beginPath(); g.ellipse(x + 8.5 * s, y, 4 * s, 9 * s, 0, -1.4, 1.4); g.fill();
+    g.fillStyle = '#5e6c80';
+    for (const dy of [-4, 0, 4]) { g.beginPath(); g.arc(x + 10.5 * s, y + dy * s, .9 * s, 0, TAU); g.fill(); }
+  } else if (e.type === 'assassino') {
+    g.strokeStyle = '#d8dce0'; g.lineWidth = 1.8 * s; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(x + 8 * s, y + 2 * s); g.lineTo(x + 14 * s, y - 6 * s); g.stroke();
+    g.beginPath(); g.moveTo(x - 8 * s, y + 2 * s); g.lineTo(x - 14 * s, y - 6 * s); g.stroke();
+  } else if (e.divideEm && e.s > 8) {
+    g.fillStyle = '#f5ead3'; // presas do gigante
+    g.beginPath(); g.moveTo(x - 4 * s, y + 1 * s); g.lineTo(x - 5.5 * s, y - 2.5 * s); g.lineTo(x - 2.5 * s, y - .5 * s); g.closePath();
+    g.moveTo(x + 4 * s, y + 1 * s); g.lineTo(x + 5.5 * s, y - 2.5 * s); g.lineTo(x + 2.5 * s, y - .5 * s); g.closePath(); g.fill();
+  } else {
+    g.strokeStyle = '#d8dce0'; g.lineWidth = 2.2 * s; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(x + 9 * s, y + 2 * s); g.lineTo(x + 15 * s, y - 8 * s); g.stroke();
+    g.strokeStyle = '#7a5228'; g.lineWidth = 2.6 * s;
+    g.beginPath(); g.moveTo(x + 8 * s, y + 4 * s); g.lineTo(x + 10.5 * s, y); g.stroke();
+  }
+  if (e.type === 'chefe') {
+    g.fillStyle = '#2b2b2b';
+    for (const dx of [-5, 0, 5]) {
+      g.beginPath(); g.moveTo(x + dx * s - 2.4 * s, y - 12 * s); g.lineTo(x + dx * s, y - 17 * s); g.lineTo(x + dx * s + 2.4 * s, y - 12 * s); g.closePath(); g.fill();
+    }
+  }
   g.restore();
   if (e.hp < e.maxHp) {
+    const bw = Math.min(28 * s, 130);
     g.fillStyle = 'rgba(0,0,0,.45)';
-    g.fillRect(e.x - 14 * s, e.y - 16 * s - 8, 28 * s, 5);
+    g.fillRect(e.x - bw / 2, e.y - 16 * s - 10, bw, 7);
     g.fillStyle = '#ff5544';
-    g.fillRect(e.x - 14 * s + 1, e.y - 16 * s - 7, (28 * s - 2) * clamp(e.hp / e.maxHp, 0, 1), 3);
+    g.fillRect(e.x - bw / 2 + 1, e.y - 16 * s - 9, (bw - 2) * clamp(e.hp / e.maxHp, 0, 1), 5);
   }
 }
 function drawKing(g) {
@@ -1066,10 +1233,11 @@ function drawKing(g) {
   }
   const KH = 120;
   contact(g, king.x, king.y + 12, 24, 9, .5);
-  let name;
+  let name, flip = false;
   if (king.attackT > 0) {
     const ph = clamp(Math.floor((0.38 - king.attackT) / 0.38 * 3), 0, 2);
     name = KING_ANIM.ataque[ph];
+    flip = Math.cos(king.attackDir) < 0;   // golpe para a esquerda: espelha a animação
   } else if (king.moving) {
     const seq = KING_ANIM[king.dirKey] || KING_ANIM.frente;
     name = seq[[0, 1, 2, 1][Math.floor(king.animT) % 4]];
@@ -1078,7 +1246,13 @@ function drawKing(g) {
   }
   const img = sprites[name];
   if (img && img.complete && img.naturalWidth) {
-    g.drawImage(img, king.x - KH / 2, king.y - KH + 14, KH, KH);
+    if (flip) {
+      g.save(); g.translate(king.x, 0); g.scale(-1, 1); g.translate(-king.x, 0);
+      g.drawImage(img, king.x - KH / 2, king.y - KH + 14, KH, KH);
+      g.restore();
+    } else {
+      g.drawImage(img, king.x - KH / 2, king.y - KH + 14, KH, KH);
+    }
   }
   if (king.hp < king.maxHp) {
     g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(king.x - 20, king.y - KH + 4, 40, 6);
@@ -1205,19 +1379,33 @@ function render() {
   }
   // barra de HP do casarão
   if (MANOR.hp < MANOR.maxHp) {
-    ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.beginPath(); ctx.roundRect(MANOR.x - 55, MANOR.y - 175, 110, 10, 5); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.beginPath(); ctx.roundRect(MANOR.x - 90, 96, 180, 16, 8); ctx.fill();
     ctx.fillStyle = MANOR.hp / MANOR.maxHp > .4 ? '#6ddd55' : '#ff5544';
-    ctx.beginPath(); ctx.roundRect(MANOR.x - 53, MANOR.y - 173, 106 * clamp(MANOR.hp / MANOR.maxHp, 0, 1), 6, 3); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(MANOR.x - 87, 99, 174 * clamp(MANOR.hp / MANOR.maxHp, 0, 1), 10, 5); ctx.fill();
   }
-  // virotes
+  // virotes das torres (grandes e visíveis)
   ctx.lineCap = 'round';
   for (const b of bolts) {
     const d = Math.max(1, dist(b.x, b.y, b.tx, b.ty));
     const ux = (b.tx - b.x) / d, uy = (b.ty - b.y) / d;
-    ctx.strokeStyle = '#7a5228'; ctx.lineWidth = 3.5;
-    ctx.beginPath(); ctx.moveTo(b.x - ux * 9, b.y - uy * 9); ctx.lineTo(b.x + ux * 9, b.y + uy * 9); ctx.stroke();
-    ctx.strokeStyle = '#e8dcc0'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(b.x + ux * 4, b.y + uy * 4); ctx.lineTo(b.x + ux * 9, b.y + uy * 9); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,220,120,.35)'; ctx.lineWidth = 16;
+    ctx.beginPath(); ctx.moveTo(b.x - ux * 30, b.y - uy * 30); ctx.lineTo(b.x + ux * 26, b.y + uy * 26); ctx.stroke();
+    ctx.strokeStyle = '#7a5228'; ctx.lineWidth = 10;
+    ctx.beginPath(); ctx.moveTo(b.x - ux * 26, b.y - uy * 26); ctx.lineTo(b.x + ux * 20, b.y + uy * 20); ctx.stroke();
+    ctx.strokeStyle = '#e8dcc0'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(b.x + ux * 8, b.y + uy * 8); ctx.lineTo(b.x + ux * 26, b.y + uy * 26); ctx.stroke();
+    // penas
+    ctx.strokeStyle = '#c62818'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(b.x - ux * 26 - uy * 7, b.y - uy * 26 + ux * 7); ctx.lineTo(b.x - ux * 16, b.y - uy * 16); ctx.moveTo(b.x - ux * 26 + uy * 7, b.y - uy * 26 - ux * 7); ctx.lineTo(b.x - ux * 16, b.y - uy * 16); ctx.stroke();
+  }
+  // lanças dos atiradores inimigos
+  for (const s2 of eshots) {
+    const d = Math.max(1, dist(s2.x, s2.y, s2.tx, s2.ty));
+    const ux = (s2.tx - s2.x) / d, uy = (s2.ty - s2.y) / d;
+    ctx.strokeStyle = '#5a3a1a'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(s2.x - ux * 24, s2.y - uy * 24); ctx.lineTo(s2.x + ux * 18, s2.y + uy * 18); ctx.stroke();
+    ctx.strokeStyle = '#b8bec4'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(s2.x + ux * 12, s2.y + uy * 12); ctx.lineTo(s2.x + ux * 24, s2.y + uy * 24); ctx.stroke();
   }
   // partículas
   for (const p of parts) {
@@ -1227,7 +1415,7 @@ function render() {
   }
   ctx.globalAlpha = 1;
   // textos flutuantes
-  ctx.font = 'bold 15px system-ui'; ctx.textAlign = 'center';
+  ctx.font = 'bold 22px system-ui'; ctx.textAlign = 'center';
   for (const f of floats) {
     ctx.globalAlpha = clamp(1.3 - f.t, 0, 1);
     ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,.55)';
