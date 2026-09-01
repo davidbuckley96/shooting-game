@@ -69,15 +69,21 @@ Transformar o protótipo em jogo com decisões interessantes.
 - [x] 3 tipos de inimigos (goblin rápido, bruto tanque, **chefão** a cada 5 noites) — falta avaliar inimigo à distância
 - [ ] Curva de dificuldade e balanceamento da economia (planilha de tuning + simulações automáticas)
 - [ ] Variedade de mapa (obstáculos, pontos de spawn variados)
-- [ ] **Rei com ataque à distância (arco), alcance ~4x o atual** — decisão do David (kiting é o núcleo do gameplay)
+- [ ] **PIVÔ DE GAMEPLAY (decisão do David, 2026-09-01):** tower defense direcional —
+      inimigos vêm de UMA direção específica a cada nível, seguindo caminho/lane
+- [ ] **Torres NÃO atacáveis** pelos inimigos (invulneráveis); alvo dos inimigos é o castelo/casarão
+- [ ] **Rei a pé** (cavalo removido), começa com ESPADA (melee); progressão futura: arco → poderes
+- [ ] Rei também coleta recursos (moedas no mapa)
 - [ ] **Hordas maiores** para viabilizar kiting (rebalancear waves/economia junto)
 - [ ] Habilidade especial do rei (ex.: investida da cavalaria com cooldown)
 - [x] Recorde persistente (localStorage) e estatísticas de fim de partida (abates/noites)
 
 ## FASE 3 — Polimento (game feel, arte e som) 🔨
 
-- [ ] **Identidade visual em definição** — rodada 1 de propostas enviada (`design/art-proposals.html`):
-      A) Cartoon Chunky · B) Flat Suave · C) Low-poly · D) Pixel Art HD — aguardando julgamento do David
+- [x] Identidade visual definida após 3 rodadas: **estilo "Cartoon 3D" baseado na arte de
+      referência do David** (`design/art-round3.html` é o alvo visual): casarão de telhado
+      azul de telhas, torres de blocos de pedra com bestas e estandartes azuis, pinheiros,
+      cercas, caminho de terra, horda vermelha, rei chibi a pé com espada+escudo
 - [ ] Arte procedural caprichada: rei/cavalo animados, inimigos com personalidade, castelo bonito (na identidade escolhida)
 - [ ] Partículas, tremor de tela, números de dano, knockback, flashes de acerto
 - [ ] Efeitos sonoros sintetizados (moeda, construção, corneta da noite, amanhecer, derrota)
@@ -143,3 +149,7 @@ Backlog aberto — priorizar com feedback de quem jogar.
 - **2026-09-01 (3)** — Feedback do David: gráficos mais cartoonizados, rei com ataque
   à distância (~4x) e hordas maiores p/ kiting. Criada a cena de referência com 4 propostas
   de identidade visual renderizadas em canvas (mesma composição) para julgamento.
+- **2026-09-01 (4)** — David forneceu arte de referência própria (estilo render 3D cartoon,
+  paleta azul/vermelho/verde). Rodada 3 (`art-round3.html`) reproduz a referência em canvas:
+  aprovação pendente. Novo desenho de gameplay: TD direcional com lanes, torres invulneráveis,
+  rei a pé com espada (→ arco → poderes no futuro), coleta de recursos.
