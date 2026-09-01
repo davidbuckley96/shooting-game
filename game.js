@@ -59,6 +59,77 @@ function beep(freq, dur = 0.08, type = 'square', vol = 0.14, slide = 0, delay = 
     o.start(t0); o.stop(t0 + dur + 0.02);
   } catch (e) {}
 }
+// ---- música: jiga medieval alegre (sequenciador WebAudio) ----
+const N = { D3: 146.83, A2: 110.00, C3: 130.81, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.00, A4: 440.00, C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46 };
+const MEL = [ // 8 compassos x 6 colcheias (0 = pausa)
+  N.D4, N.F4, N.A4, N.D5, N.A4, N.F4,
+  N.E4, N.G4, N.A4, N.C5, N.A4, N.G4,
+  N.D4, N.F4, N.A4, N.D5, N.A4, N.F4,
+  N.E4, N.C5, N.A4, N.G4, N.F4, N.E4,
+  N.F4, N.A4, N.D5, N.F5, N.D5, N.A4,
+  N.E4, N.G4, N.C5, N.E5, N.C5, N.G4,
+  N.D5, N.A4, N.F4, N.D4, N.F4, N.A4,
+  N.E4, N.G4, N.E4, N.D4, 0, 0,
+];
+const BASSO = [N.D3, N.C3, N.D3, N.A2, N.D3, N.C3, N.D3, N.D3]; // 1 por compasso
+const STEP = 0.16; // duração da colcheia (s)
+let musicGain = null, musicNext = 0, musicStep = 0, musicTimer = null;
+function pluck(freq, t, dur = 0.22, vol = 0.07) {
+  const ac = actx;
+  const o = ac.createOscillator(), o2 = ac.createOscillator(), g = ac.createGain();
+  o.type = 'triangle'; o.frequency.value = freq;
+  o2.type = 'square'; o2.frequency.value = freq * 2; // brilho de alaúde
+  const g2 = ac.createGain(); g2.gain.value = 0.18;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); o2.connect(g2); g2.connect(g); g.connect(musicGain);
+  o.start(t); o.stop(t + dur + 0.02); o2.start(t); o2.stop(t + dur + 0.02);
+}
+function bordao(freq, t) {
+  const ac = actx;
+  for (const f of [freq, freq * 1.5]) { // raiz + quinta
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'triangle'; o.frequency.value = f;
+    g.gain.setValueAtTime(f === freq ? 0.055 : 0.03, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.42);
+    o.connect(g); g.connect(musicGain);
+    o.start(t); o.stop(t + 0.45);
+  }
+}
+function tamborim(t, forte) {
+  const ac = actx;
+  const len = Math.floor(ac.sampleRate * 0.05);
+  const buf = ac.createBuffer(1, len, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const s = ac.createBufferSource(); s.buffer = buf;
+  const f = ac.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 2600;
+  const g = ac.createGain(); g.gain.value = forte ? 0.05 : 0.028;
+  s.connect(f); f.connect(g); g.connect(musicGain);
+  s.start(t);
+}
+function startMusic() {
+  const ac = audioCtx();
+  if (!ac || musicTimer) return;
+  musicGain = ac.createGain();
+  musicGain.gain.value = muted ? 0 : 1;
+  musicGain.connect(ac.destination);
+  musicNext = ac.currentTime + 0.1;
+  musicStep = 0;
+  musicTimer = setInterval(() => {
+    try {
+      while (musicNext < ac.currentTime + 0.35) {
+        const i = musicStep % MEL.length;
+        if (MEL[i]) pluck(MEL[i], musicNext, i % 6 === 0 ? 0.3 : 0.2, i % 6 === 0 ? 0.085 : 0.06);
+        if (i % 6 === 0) { bordao(BASSO[Math.floor(i / 6)], musicNext); tamborim(musicNext, true); }
+        if (i % 6 === 3) tamborim(musicNext, false);
+        musicNext += STEP;
+        musicStep++;
+      }
+    } catch (e) {}
+  }, 120);
+}
+
 const sfx = {
   coin:  () => beep(920, .07, 'square', .10, 400),
   build: () => { beep(280, .09, 'triangle', .2, 160); beep(470, .12, 'triangle', .2, 200, .08); },
@@ -233,7 +304,7 @@ const TOWER = {
 const joy = { active: false, id: null, ox: 0, oy: 0, dx: 0, dy: 0 };
 const keys = {};
 canvas.addEventListener('pointerdown', e => {
-  audioCtx();
+  audioCtx(); startMusic();
   if (joy.active) return;
   joy.active = true; joy.id = e.pointerId;
   joy.ox = e.clientX; joy.oy = e.clientY; joy.dx = joy.dy = 0;
@@ -278,7 +349,7 @@ const menuEl = $('menu'), overEl = $('over'), overText = $('overText'), menuBest
 const levelEndEl = $('levelEnd'), levelEndText = $('levelEndText');
 const shopEl = $('shop'), uiGold = $('uiGold'), uiMission = $('uiMission');
 const consEl = $('consumables');
-$('playBtn').addEventListener('click', () => { audioCtx(); startLevel(); });
+$('playBtn').addEventListener('click', () => { audioCtx(); startMusic(); startLevel(); });
 $('retryBtn').addEventListener('click', () => { audioCtx(); showMenu(); });
 $('menuBtn').addEventListener('click', () => { audioCtx(); showMenu(); });
 waveBtn.addEventListener('click', () => { if (state === 'play' && wavePhase === 'countdown') waveTimer = 0; });
@@ -315,6 +386,8 @@ function renderInventory() {
 $('muteBtn').addEventListener('click', () => {
   muted = !muted;
   $('muteBtn').textContent = muted ? '🔇' : '🔊';
+  if (musicGain) musicGain.gain.value = muted ? 0 : 1;
+  if (!muted) startMusic();
 });
 if (best > 0) menuBest.textContent = `🏆 Recorde: nível ${best}`;
 
@@ -850,15 +923,15 @@ function update(dt) {
       c.x += c.vx * dt; c.y += c.vy * dt; c.vy += 500 * dt; c.vx *= 0.96;
     } else if (!king.dead) {
       const d = dist(c.x, c.y, king.x, king.y);
-      if (d < 30) {
+      if (d < 58) {
         coins += c.val;
         addFloat(king.x, king.y - 60, `+${c.val}`, '#ffd23e');
         sfx.coin();
         coinDrops.splice(i, 1);
         continue;
       }
-      if (d < 100) {
-        const sp = 400 * (1 - d / 120);
+      if (d < 160) {
+        const sp = 420 * (1 - d / 190);
         c.x += (king.x - c.x) / d * sp * dt;
         c.y += (king.y - c.y) / d * sp * dt;
       }
@@ -1336,13 +1409,21 @@ function render() {
   ctx.save();
   ctx.translate(ox, oy);
   ctx.drawImage(worldC, 0, 0);
-  // moedas no chão
+  // moedas no chão (6x, com coroa cunhada)
   for (const c of coinDrops) {
-    const gm = ctx.createRadialGradient(c.x - 2, c.y - 2, 1, c.x, c.y, 8);
+    contact(ctx, c.x, c.y + 30, 34, 12, .3);
+    const gm = ctx.createRadialGradient(c.x - 12, c.y - 12, 4, c.x, c.y, 46);
     gm.addColorStop(0, '#ffe082'); gm.addColorStop(.6, '#f2c14e'); gm.addColorStop(1, '#c8901a');
-    ctx.fillStyle = gm; ctx.beginPath(); ctx.arc(c.x, c.y, 7, 0, TAU); ctx.fill();
-    ctx.strokeStyle = 'rgba(150,100,10,.7)'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(c.x, c.y, 4.2, 0, TAU); ctx.stroke();
+    ctx.fillStyle = gm; ctx.beginPath(); ctx.arc(c.x, c.y, 40, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(150,100,10,.75)'; ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.arc(c.x, c.y, 27, 0, TAU); ctx.stroke();
+    ctx.fillStyle = '#a8701a';
+    ctx.beginPath();
+    ctx.moveTo(c.x - 14, c.y + 12); ctx.lineTo(c.x - 14, c.y - 6); ctx.lineTo(c.x - 6, c.y + 3);
+    ctx.lineTo(c.x, c.y - 10); ctx.lineTo(c.x + 6, c.y + 3); ctx.lineTo(c.x + 14, c.y - 6); ctx.lineTo(c.x + 14, c.y + 12);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.65)';
+    ctx.beginPath(); ctx.ellipse(c.x - 14, c.y - 17, 12, 6, -0.6, 0, TAU); ctx.fill();
   }
   // seta da direção do próximo nível (fase de preparação)
   if (state === 'play' && wavePhase === 'countdown') {

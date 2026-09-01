@@ -188,3 +188,7 @@ Backlog aberto — priorizar com feedback de quem jogar.
   cada um em 4 minis; 16 no total); escala visual: inimigos 5x, torres 3x, projéteis 5x com
   penas e brilho, casarão 2x (3x literal não cabe no mapa 1400px — expandir mundo se o David
   quiser mais); golpe do rei ESPELHADO quando vira à esquerda; zoom 0.5. 20 testes verdes.
+- **2026-09-01 (10)** — v6: TRILHA SONORA sintetizada (jiga medieval em Ré dórico: alaúde
+  em colcheias, bordão raiz+quinta, tamborim; 8 compassos em loop, volume discreto, começa
+  no primeiro toque, botão 🔊 silencia tudo); MOEDAS 6x com coroa cunhada, sombra e brilho,
+  ímã de coleta ampliado (160px). 20 testes verdes. Republicado no link.
