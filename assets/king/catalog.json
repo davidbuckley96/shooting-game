@@ -1,0 +1,238 @@
+{
+ "cell": 724,
+ "fonte": "21 quadros gerados pelo David (ChatGPT), 1/set/2026",
+ "regra": "espada SEMPRE na mão direita, escudo SEMPRE na esquerda",
+ "acoes": {
+  "costas-mao-errada": {
+   "ok": false,
+   "tira": "tira-1",
+   "frames": [
+    {
+     "file": "costas-mao-errada-1.png",
+     "bbox": [
+      0,
+      0,
+      724,
+      705
+     ]
+    },
+    {
+     "file": "costas-mao-errada-2.png",
+     "bbox": [
+      5,
+      0,
+      718,
+      713
+     ]
+    },
+    {
+     "file": "costas-mao-errada-3.png",
+     "bbox": [
+      1,
+      0,
+      692,
+      706
+     ]
+    }
+   ]
+  },
+  "corre-frente-a": {
+   "ok": true,
+   "tira": "tira-2",
+   "frames": [
+    {
+     "file": "corre-frente-a-1.png",
+     "bbox": [
+      41,
+      7,
+      711,
+      706
+     ]
+    },
+    {
+     "file": "corre-frente-a-2.png",
+     "bbox": [
+      25,
+      0,
+      718,
+      708
+     ]
+    },
+    {
+     "file": "corre-frente-a-3.png",
+     "bbox": [
+      29,
+      5,
+      704,
+      712
+     ]
+    }
+   ]
+  },
+  "corre-direita": {
+   "ok": true,
+   "tira": "tira-3",
+   "frames": [
+    {
+     "file": "corre-direita-1.png",
+     "bbox": [
+      0,
+      4,
+      708,
+      712
+     ]
+    },
+    {
+     "file": "corre-direita-2.png",
+     "bbox": [
+      15,
+      0,
+      722,
+      707
+     ]
+    },
+    {
+     "file": "corre-direita-3.png",
+     "bbox": [
+      1,
+      12,
+      708,
+      712
+     ]
+    }
+   ]
+  },
+  "corre-costas": {
+   "ok": true,
+   "tira": "tira-4",
+   "frames": [
+    {
+     "file": "corre-costas-1.png",
+     "bbox": [
+      120,
+      0,
+      718,
+      710
+     ]
+    },
+    {
+     "file": "corre-costas-2.png",
+     "bbox": [
+      55,
+      1,
+      724,
+      709
+     ]
+    },
+    {
+     "file": "corre-costas-3.png",
+     "bbox": [
+      9,
+      0,
+      710,
+      724
+     ]
+    }
+   ]
+  },
+  "corre-costas-diag": {
+   "ok": true,
+   "tira": "tira-5",
+   "frames": [
+    {
+     "file": "corre-costas-diag-1.png",
+     "bbox": [
+      33,
+      2,
+      724,
+      700
+     ]
+    },
+    {
+     "file": "corre-costas-diag-2.png",
+     "bbox": [
+      37,
+      0,
+      708,
+      709
+     ]
+    },
+    {
+     "file": "corre-costas-diag-3.png",
+     "bbox": [
+      1,
+      0,
+      692,
+      698
+     ]
+    }
+   ]
+  },
+  "corre-frente-b": {
+   "ok": true,
+   "tira": "tira-6",
+   "frames": [
+    {
+     "file": "corre-frente-b-1.png",
+     "bbox": [
+      114,
+      0,
+      712,
+      724
+     ]
+    },
+    {
+     "file": "corre-frente-b-2.png",
+     "bbox": [
+      23,
+      0,
+      720,
+      693
+     ]
+    },
+    {
+     "file": "corre-frente-b-3.png",
+     "bbox": [
+      9,
+      0,
+      702,
+      724
+     ]
+    }
+   ]
+  },
+  "ataque": {
+   "ok": true,
+   "tira": "tira-7",
+   "frames": [
+    {
+     "file": "ataque-1.png",
+     "bbox": [
+      15,
+      14,
+      710,
+      709
+     ]
+    },
+    {
+     "file": "ataque-2.png",
+     "bbox": [
+      54,
+      0,
+      724,
+      710
+     ]
+    },
+    {
+     "file": "ataque-3.png",
+     "bbox": [
+      0,
+      11,
+      724,
+      710
+     ]
+    }
+   ]
+  }
+ }
+}

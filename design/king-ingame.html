@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Arte rodada 3 — referência do David</title>
+<style>body{margin:0;background:#1a1a1a;display:flex;flex-direction:column;gap:24px;align-items:center;padding:24px}canvas{width:390px;height:844px;border-radius:12px}</style>
+</head><body>
+<canvas id="propF" width="780" height="1688"></canvas>
+<script>
+const TAU=Math.PI*2;
+const ctx=document.getElementById('propF').getContext('2d');
+ctx.scale(2,2);
+
+// ---------- utilidades ----------
+let seed=7;
+const rnd=()=>{seed=(seed*1103515245+12345)&0x7fffffff;return seed/0x7fffffff;};
+function hx(h){return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];}
+function css(r,g,b,a=1){return `rgba(${r|0},${g|0},${b|0},${a})`;}
+function shade(h,f){const [r,g,b]=hx(h);return f>=0?css(r+(255-r)*f,g+(255-g)*f,b+(255-b)*f):css(r*(1+f),g*(1+f),b*(1+f));}
+function contact(x,y,rx,ry,a=0.35){
+  const g=ctx.createRadialGradient(x,y,0,x,y,rx);
+  g.addColorStop(0,`rgba(20,40,12,${a})`);g.addColorStop(1,'rgba(20,40,12,0)');
+  ctx.save();ctx.translate(x,y);ctx.scale(1,ry/rx);ctx.translate(-x,-y);
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,rx,0,TAU);ctx.fill();ctx.restore();
+}
+
+// ---------- gramado rico ----------
+(function ground(){
+  const g=ctx.createRadialGradient(195,360,100,195,460,640);
+  g.addColorStop(0,'#79bd45');g.addColorStop(.65,'#61a637');g.addColorStop(1,'#4a8c2a');
+  ctx.fillStyle=g;ctx.fillRect(0,0,390,844);
+  // textura de grama: pinceladas curtas
+  for(let i=0;i<900;i++){
+    const x=rnd()*390,y=rnd()*844;
+    ctx.fillStyle=`rgba(${rnd()>.5?'255,255,255':'20,70,10'},${.04+rnd()*.05})`;
+    ctx.fillRect(x,y,1.5+rnd()*2,3+rnd()*4);
+  }
+  // manchas claras/escuras orgânicas
+  for(const [px,py,pr,l] of [[80,300,70,0],[300,700,80,0],[190,560,60,1],[330,240,50,1],[60,750,55,1],[140,120,45,0]]){
+    const sg=ctx.createRadialGradient(px,py,0,px,py,pr);
+    sg.addColorStop(0,l?'rgba(200,255,140,.12)':'rgba(20,70,10,.14)');sg.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=sg;ctx.beginPath();ctx.ellipse(px,py,pr,pr*.6,0,0,TAU);ctx.fill();
+  }
+  // florzinhas
+  for(const [fx,fy] of [[70,200,],[330,320],[40,560],[350,760],[120,700],[250,180],[300,480]]){
+    for(let p=0;p<5;p++){const a=p/5*TAU;
+      ctx.fillStyle='#fff';ctx.beginPath();ctx.ellipse(fx+Math.cos(a)*3,fy+Math.sin(a)*3,2,1.4,a,0,TAU);ctx.fill();}
+    ctx.fillStyle='#ffd23e';ctx.beginPath();ctx.arc(fx,fy,1.8,0,TAU);ctx.fill();
+  }
+})();
+
+// ---------- rio (canto superior esquerdo) ----------
+(function river(){
+  ctx.save();
+  const R=new Path2D();
+  R.moveTo(0,0);R.lineTo(150,0);R.quadraticCurveTo(95,60,70,140);R.quadraticCurveTo(52,200,0,235);R.closePath();
+  const g=ctx.createLinearGradient(0,0,140,220);
+  g.addColorStop(0,'#3f8fd4');g.addColorStop(.6,'#2f74b8');g.addColorStop(1,'#28629e');
+  ctx.fillStyle=g;ctx.fill(R);
+  ctx.clip(R);
+  // correnteza
+  ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=3;ctx.lineCap='round';
+  for(const [sx,sy,ex,ey] of [[15,30,55,95],[60,15,90,70],[25,120,55,180],[95,20,115,55],[10,180,30,215]]){
+    ctx.beginPath();ctx.moveTo(sx,sy);ctx.quadraticCurveTo((sx+ex)/2+10,(sy+ey)/2,ex,ey);ctx.stroke();
+  }
+  ctx.restore();
+  // margem de pedras: amostra as duas curvas quadráticas da borda
+  const q=(p0,c,p1,t)=>[(1-t)*(1-t)*p0[0]+2*(1-t)*t*c[0]+t*t*p1[0],(1-t)*(1-t)*p0[1]+2*(1-t)*t*c[1]+t*t*p1[1]];
+  const bank=[];
+  for(let i=0;i<=6;i++)bank.push(q([150,0],[95,60],[70,140],i/6));
+  for(let i=1;i<=6;i++)bank.push(q([70,140],[52,200],[0,235],i/6));
+  for(const [bx0,by0] of bank){
+    const bx=bx0+3+rnd()*4, by=by0+2+rnd()*3, r=4.5+rnd()*3.5;
+    contact(bx+2,by+3,r*1.3,r*.7,.3);
+    const sg=ctx.createRadialGradient(bx-r*.3,by-r*.4,r*.2,bx,by,r);
+    sg.addColorStop(0,'#cfd4d8');sg.addColorStop(1,'#8f979e');
+    ctx.fillStyle=sg;ctx.beginPath();ctx.arc(bx,by,r,0,TAU);ctx.fill();
+  }
+})();
+
+// ---------- caminho de terra (do canto inferior esquerdo ao castelo) ----------
+const PATH=new Path2D();
+PATH.moveTo(30,844);PATH.quadraticCurveTo(120,700,150,590);PATH.quadraticCurveTo(180,480,195,440);PATH.quadraticCurveTo(230,360,255,300);
+(function path(){
+  ctx.strokeStyle='#ceb075';ctx.lineWidth=52;ctx.lineCap='round';ctx.stroke(PATH);
+  ctx.strokeStyle='#c2a267';ctx.lineWidth=44;ctx.stroke(PATH);
+  ctx.strokeStyle='#b5945a';ctx.lineWidth=34;ctx.stroke(PATH);
+  // sujeirinha/pedras do caminho
+  for(let i=0;i<26;i++){
+    const t=i/25;
+    // ponto aproximado ao longo da curva (amostragem grosseira)
+    const x=30+(150-30)*Math.min(t*2,1)*.5+ (t<.5? (120-30)*t*1.2 : 90+(255-120)*(t-.5)*2*.85);
+    const y=844-(844-300)*t;
+    ctx.fillStyle=`rgba(${rnd()>.5?'160,125,70':'230,210,160'},${.5+rnd()*.3})`;
+    ctx.beginPath();ctx.ellipse(x+(rnd()*24-12),y+(rnd()*10-5),2.5+rnd()*2,1.6+rnd()*1.2,rnd(),0,TAU);ctx.fill();
+  }
+})();
+
+// ---------- cerquinha de madeira ----------
+function fence(x1,y1,x2,y2,n){
+  const wood='#a8763e';
+  ctx.lineCap='round';
+  // travessas
+  for(const off of [-7,1]){
+    ctx.strokeStyle=shade(wood,-.18);ctx.lineWidth=4.5;
+    ctx.beginPath();ctx.moveTo(x1,y1+off);ctx.lineTo(x2,y2+off);ctx.stroke();
+    ctx.strokeStyle=shade(wood,.12);ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(x1,y1+off-1);ctx.lineTo(x2,y2+off-1);ctx.stroke();
+  }
+  // mourões
+  for(let i=0;i<=n;i++){
+    const t=i/n, px=x1+(x2-x1)*t, py=y1+(y2-y1)*t;
+    contact(px,py+9,6,2.5,.3);
+    const g=ctx.createLinearGradient(px-3.5,0,px+3.5,0);
+    g.addColorStop(0,shade(wood,.22));g.addColorStop(.5,wood);g.addColorStop(1,shade(wood,-.3));
+    ctx.fillStyle=g;ctx.beginPath();ctx.roundRect(px-3.5,py-16,7,25,2.5);ctx.fill();
+    ctx.fillStyle=shade(wood,.3);ctx.beginPath();ctx.ellipse(px,py-16,3.5,1.6,0,0,TAU);ctx.fill();
+  }
+}
+
+// ---------- pinheiros ----------
+function pine(x,y,s){
+  contact(x,y+6*s,16*s,6*s,.4);
+  const g=ctx.createLinearGradient(x-4*s,0,x+4*s,0);
+  g.addColorStop(0,'#9c6a3a');g.addColorStop(1,'#6b4322');
+  ctx.fillStyle=g;ctx.fillRect(x-3.5*s,y-6*s,7*s,12*s);
+  const L='#3f8c33',D='#2c6b24';
+  for(let i=0;i<3;i++){
+    const w=(24-i*6)*s, yy=y-(4+i*14)*s, h=18*s;
+    ctx.fillStyle=L;
+    ctx.beginPath();ctx.moveTo(x-w/2,yy);ctx.lineTo(x,yy-h);ctx.lineTo(x,yy+2*s);ctx.closePath();ctx.fill();
+    ctx.fillStyle=D;
+    ctx.beginPath();ctx.moveTo(x+w/2,yy);ctx.lineTo(x,yy-h);ctx.lineTo(x,yy+2*s);ctx.closePath();ctx.fill();
+    // borda inferior serrilhada (luz)
+    ctx.fillStyle='rgba(255,255,255,.14)';
+    ctx.beginPath();ctx.moveTo(x-w/2,yy);ctx.lineTo(x-w/4,yy-3*s);ctx.lineTo(x,yy);ctx.closePath();ctx.fill();
+  }
+}
+
+// ---------- torre de pedra com besta (invulnerável) ----------
+function crossbowTower(x,y,s=1){
+  contact(x,y+30*s,36*s,13*s,.45);
+  const W=46*s,H=64*s;
+  // base contínua atrás dos blocos (sem frestas de grama)
+  ctx.fillStyle='#6f767d';
+  ctx.beginPath();ctx.roundRect(x-W/2,y+28*s-H,W,H,4*s);ctx.fill();
+  ctx.save();
+  ctx.beginPath();ctx.roundRect(x-W/2,y+28*s-H,W,H,4*s);ctx.clip();
+  // blocos de pedra
+  const rows=5,cols=3;
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const bw=W/cols, bh=H/rows;
+      const bx=x-W/2+c*bw+(r%2?bw*.3:0), by=y+28*s-H+r*bh;
+      const tone=.06+rnd()*.16 - (c===cols-1?.2:0) + (c===0?.08:0);
+      ctx.fillStyle=shade('#a8adb4',tone);
+      ctx.beginPath();ctx.roundRect(bx+1,by+1,bw-2,bh-2,3*s);ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,.18)';
+      ctx.beginPath();ctx.roundRect(bx+2,by+2,bw-4,2.5*s,2*s);ctx.fill();
+    }
+  }
+  ctx.restore();
+  // coroamento (borda superior mais larga)
+  const cg=ctx.createLinearGradient(x-W/2-5*s,0,x+W/2+5*s,0);
+  cg.addColorStop(0,'#cfd4d8');cg.addColorStop(.5,'#b8bec4');cg.addColorStop(1,'#8f979e');
+  ctx.fillStyle=cg;ctx.beginPath();ctx.roundRect(x-W/2-5*s,y+28*s-H-9*s,W+10*s,11*s,3*s);ctx.fill();
+  // ameias
+  for(const dx of [-1,0,1]){
+    ctx.fillStyle=dx===1?'#8f979e':'#c4c9ce';
+    ctx.fillRect(x+dx*(W/2-4*s)-4.5*s,y+28*s-H-16*s,9*s,8*s);
+  }
+  // estandarte azul com coroa
+  const bg=ctx.createLinearGradient(x-9*s,0,x+9*s,0);
+  bg.addColorStop(0,'#4a8ae0');bg.addColorStop(1,'#2a5cb0');
+  ctx.fillStyle=bg;
+  ctx.beginPath();ctx.moveTo(x-8*s,y-2*s);ctx.lineTo(x+8*s,y-2*s);ctx.lineTo(x+8*s,y+22*s);ctx.lineTo(x,y+16*s);ctx.lineTo(x-8*s,y+22*s);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#f5f8ff';
+  ctx.beginPath();ctx.moveTo(x-4.5*s,y+9*s);ctx.lineTo(x-4.5*s,y+3.5*s);ctx.lineTo(x-1.8*s,y+6.5*s);ctx.lineTo(x,y+3*s);ctx.lineTo(x+1.8*s,y+6.5*s);ctx.lineTo(x+4.5*s,y+3.5*s);ctx.lineTo(x+4.5*s,y+9*s);ctx.closePath();ctx.fill();
+  // besta no topo (madeira em X + arco)
+  ctx.save();
+  ctx.translate(x,y+28*s-H-20*s);
+  ctx.rotate(-.12);
+  // braço principal
+  const wg=ctx.createLinearGradient(0,-4*s,0,4*s);
+  wg.addColorStop(0,'#c89858');wg.addColorStop(.5,'#a8763e');wg.addColorStop(1,'#7a5228');
+  ctx.fillStyle=wg;ctx.beginPath();ctx.roundRect(-26*s,-3.5*s,52*s,7*s,3.5*s);ctx.fill();
+  // arco transversal
+  ctx.strokeStyle='#8a5f30';ctx.lineWidth=5*s;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(14*s,-20*s);ctx.quadraticCurveTo(30*s,0,14*s,20*s);ctx.stroke();
+  ctx.strokeStyle='#d8c8a8';ctx.lineWidth=1.6*s;
+  ctx.beginPath();ctx.moveTo(15*s,-19*s);ctx.lineTo(-20*s,0);ctx.lineTo(15*s,19*s);ctx.stroke();
+  // mecanismo central metálico
+  ctx.fillStyle='#5a80b8';ctx.beginPath();ctx.roundRect(-7*s,-6*s,14*s,12*s,3*s);ctx.fill();
+  ctx.fillStyle='#88aede';ctx.beginPath();ctx.roundRect(-7*s,-6*s,14*s,4*s,3*s);ctx.fill();
+  // virote carregado
+  ctx.strokeStyle='#e8dcc0';ctx.lineWidth=2.4*s;
+  ctx.beginPath();ctx.moveTo(-18*s,0);ctx.lineTo(20*s,0);ctx.stroke();
+  ctx.fillStyle='#e8dcc0';ctx.beginPath();ctx.moveTo(24*s,0);ctx.lineTo(17*s,-3.5*s);ctx.lineTo(17*s,3.5*s);ctx.closePath();ctx.fill();
+  ctx.restore();
+}
+
+// ---------- casa-castelo de telhado azul ----------
+function manor(x,y){
+  const s=1.15;
+  contact(x+6,y+62*s,95*s,26*s,.45);
+  // corpo de pedra + madeira
+  const W=120*s,H=68*s;
+  // parede: base contínua + blocos por cima
+  ctx.fillStyle='#a89f8e';ctx.fillRect(x-W/2,y-H,W,H);
+  ctx.save();ctx.beginPath();ctx.rect(x-W/2,y-H,W,H);ctx.clip();
+  for(let r=0;r<4;r++)for(let c=0;c<7;c++){
+    const bw=W/6,bh=H/4;
+    const bx=x-W/2+c*bw-(r%2?bw*.25:0),by=y-H+r*bh;
+    ctx.fillStyle=shade('#c9c2b2',.04+rnd()*.14-(c>3?.14:0));
+    ctx.beginPath();ctx.roundRect(bx+1,by+1,bw-2,bh-2,3);ctx.fill();
+  }
+  ctx.restore();
+  // vigas de madeira (enxaimel)
+  ctx.strokeStyle='#7a5228';ctx.lineWidth=5;
+  ctx.beginPath();
+  ctx.moveTo(x-W/2+6,y-H+4);ctx.lineTo(x-W/2+6,y+58*s);
+  ctx.moveTo(x+W/2-6,y-H+4);ctx.lineTo(x+W/2-6,y+58*s);
+  ctx.moveTo(x-W/2,y-H/2+6);ctx.lineTo(x+W/2,y-H/2+6);
+  ctx.stroke();
+  // base da parede até o chão
+  ctx.fillStyle='#b8b0a0';ctx.fillRect(x-W/2,y,W,58*s);
+  ctx.fillStyle='rgba(60,40,20,.14)';ctx.fillRect(x-W/2,y+44*s,W,14*s);
+  // vigas verticais na base
+  ctx.strokeStyle='#7a5228';ctx.lineWidth=5;
+  for(const dx of [-W/2+6,-W/6,W/6,W/2-6]){ctx.beginPath();ctx.moveTo(x+dx,y);ctx.lineTo(x+dx,y+58*s);ctx.stroke();}
+  // porta de madeira com arco
+  const dg=ctx.createLinearGradient(x-16,0,x+16,0);
+  dg.addColorStop(0,'#9c6a3a');dg.addColorStop(.5,'#b8834a');dg.addColorStop(1,'#7a5228');
+  ctx.fillStyle='rgba(40,20,5,.3)';ctx.beginPath();ctx.arc(x,y+26*s,19,Math.PI,0);ctx.rect(x-19,y+26*s,38,32*s);ctx.fill();
+  ctx.fillStyle=dg;ctx.beginPath();ctx.arc(x,y+27*s,15,Math.PI,0);ctx.rect(x-15,y+27*s,30,31*s);ctx.fill();
+  ctx.strokeStyle='rgba(60,32,10,.55)';ctx.lineWidth=1.6;
+  for(const ddx of [-8,0,8]){ctx.beginPath();ctx.moveTo(x+ddx,y+14*s);ctx.lineTo(x+ddx,y+58*s);ctx.stroke();}
+  ctx.fillStyle='#3a3f45';ctx.beginPath();ctx.arc(x+8,y+40*s,2.2,0,TAU);ctx.fill();
+  // janela iluminada
+  ctx.fillStyle='#5a4a28';ctx.beginPath();ctx.roundRect(x-38,y-H+16,26,22,4);ctx.fill();
+  const wg2=ctx.createRadialGradient(x-25,y-H+26,2,x-25,y-H+26,14);
+  wg2.addColorStop(0,'#ffe89a');wg2.addColorStop(1,'#e8a83e');
+  ctx.fillStyle=wg2;ctx.beginPath();ctx.roundRect(x-35,y-H+19,20,16,3);ctx.fill();
+  ctx.strokeStyle='#5a4a28';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(x-25,y-H+19);ctx.lineTo(x-25,y-H+35);ctx.moveTo(x-35,y-H+27);ctx.lineTo(x-15,y-H+27);ctx.stroke();
+  // TELHADO AZUL DE TELHAS
+  const RY=y-H-2, RH=58*s, ROV=16; // overhang
+  const rg=ctx.createLinearGradient(x-W/2-ROV,0,x+W/2+ROV,0);
+  rg.addColorStop(0,'#4a8ae0');rg.addColorStop(.45,'#3a6fd0');rg.addColorStop(1,'#24488f');
+  ctx.fillStyle=rg;
+  ctx.beginPath();
+  ctx.moveTo(x-W/2-ROV,RY);ctx.lineTo(x-14,RY-RH);ctx.lineTo(x+14,RY-RH);ctx.lineTo(x+W/2+ROV,RY);
+  ctx.lineTo(x+W/2+ROV-8,RY+7);ctx.lineTo(x-W/2-ROV+8,RY+7);ctx.closePath();ctx.fill();
+  // fileiras de telhas
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x-W/2-ROV,RY);ctx.lineTo(x-14,RY-RH);ctx.lineTo(x+14,RY-RH);ctx.lineTo(x+W/2+ROV,RY);ctx.closePath();ctx.clip();
+  for(let r2=0;r2<6;r2++){
+    const t=r2/6, yy=RY-RH*t, half=(W/2+ROV)*(1-t*.72);
+    ctx.strokeStyle='rgba(10,25,70,.4)';ctx.lineWidth=2.2;
+    ctx.beginPath();
+    const n2=Math.max(3,10-r2);
+    for(let i=0;i<n2;i++){
+      const tx=x-half+(2*half)*(i/(n2-1));
+      ctx.moveTo(tx-6,yy);
+      ctx.arc(tx,yy,6,Math.PI,0,true);
+    }
+    ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,.16)';ctx.lineWidth=1.4;
+    ctx.beginPath();ctx.moveTo(x-half,yy-3);ctx.lineTo(x+half,yy-3);ctx.stroke();
+  }
+  ctx.restore();
+  // cumeeira
+  ctx.fillStyle='#6aa2ec';ctx.beginPath();ctx.roundRect(x-18,RY-RH-5,36,7,3.5);ctx.fill();
+  // chaminé de pedra + fumaça
+  ctx.fillStyle='#9aa0a6';ctx.fillRect(x+26,RY-RH+2,15,24);
+  ctx.fillStyle='#7d848a';ctx.fillRect(x+36,RY-RH+2,5,24);
+  ctx.fillStyle='#b8bec4';ctx.beginPath();ctx.roundRect(x+23,RY-RH-4,21,8,2);ctx.fill();
+  for(let i2=0;i2<3;i2++){
+    ctx.fillStyle=`rgba(240,240,240,${.4-i2*.11})`;
+    ctx.beginPath();ctx.arc(x+34+i2*5,RY-RH-14-i2*13,5+i2*3,0,TAU);ctx.fill();
+  }
+  // mastro com estandarte azul
+  const fx=x+62*s,fy=RY-8;
+  ctx.strokeStyle='#7a5228';ctx.lineWidth=3.5;
+  ctx.beginPath();ctx.moveTo(fx,fy+40);ctx.lineTo(fx,fy-52);ctx.stroke();
+  ctx.fillStyle='#f2c14e';ctx.beginPath();ctx.moveTo(fx,fy-60);ctx.lineTo(fx+4,fy-52);ctx.lineTo(fx-4,fy-52);ctx.closePath();ctx.fill();
+  const bg2=ctx.createLinearGradient(fx,0,fx+26,0);
+  bg2.addColorStop(0,'#4a8ae0');bg2.addColorStop(1,'#2a5cb0');
+  ctx.fillStyle=bg2;
+  ctx.beginPath();ctx.moveTo(fx+2,fy-50);ctx.lineTo(fx+26,fy-50);ctx.lineTo(fx+26,fy-6);ctx.lineTo(fx+14,fy-14);ctx.lineTo(fx+2,fy-6);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#f5f8ff';
+  ctx.beginPath();ctx.moveTo(fx+8,fy-30);ctx.lineTo(fx+8,fy-38);ctx.lineTo(fx+11.5,fy-33.5);ctx.lineTo(fx+14,fy-39);ctx.lineTo(fx+16.5,fy-33.5);ctx.lineTo(fx+20,fy-38);ctx.lineTo(fx+20,fy-30);ctx.closePath();ctx.fill();
+  // barril e lenha ao lado
+  contact(x-70,y+52,14,5,.35);
+  const brg=ctx.createLinearGradient(x-78,0,x-62,0);
+  brg.addColorStop(0,'#c89858');brg.addColorStop(.5,'#a8763e');brg.addColorStop(1,'#7a5228');
+  ctx.fillStyle=brg;ctx.beginPath();ctx.roundRect(x-78,y+30,16,22,4);ctx.fill();
+  ctx.strokeStyle='#5a4020';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(x-78,y+36);ctx.lineTo(x-62,y+36);ctx.moveTo(x-78,y+46);ctx.lineTo(x-62,y+46);ctx.stroke();
+  ctx.fillStyle='#d8b070';ctx.beginPath();ctx.ellipse(x-70,y+30,8,3,0,0,TAU);ctx.fill();
+}
+
+// ---------- moedas ----------
+function coin(x,y,s=1){
+  contact(x,y+6*s,8*s,3*s,.3);
+  const g=ctx.createRadialGradient(x-2*s,y-2*s,1,x,y,8*s);
+  g.addColorStop(0,'#ffe082');g.addColorStop(.6,'#f2c14e');g.addColorStop(1,'#c8901a');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,7.5*s,0,TAU);ctx.fill();
+  ctx.strokeStyle='rgba(150,100,10,.7)';ctx.lineWidth=1.6*s;
+  ctx.beginPath();ctx.arc(x,y,4.6*s,0,TAU);ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,.6)';ctx.beginPath();ctx.ellipse(x-2.6*s,y-3*s,2.2*s,1.2*s,-.6,0,TAU);ctx.fill();
+}
+
+// ---------- soldado inimigo vermelho ----------
+function redSoldier(x,y,s=1){
+  contact(x,y+9*s,10*s,4*s,.4);
+  // corpo arredondado vermelho
+  const g=ctx.createRadialGradient(x-3*s,y-5*s,2,x,y,12*s);
+  g.addColorStop(0,'#e86048');g.addColorStop(.55,'#c62818');g.addColorStop(1,'#8a1408');
+  ctx.fillStyle=g;
+  ctx.beginPath();ctx.moveTo(x-9*s,y+8*s);ctx.quadraticCurveTo(x-11*s,y-10*s,x,y-11*s);ctx.quadraticCurveTo(x+11*s,y-10*s,x+9*s,y+8*s);ctx.quadraticCurveTo(x,y+11*s,x-9*s,y+8*s);ctx.closePath();ctx.fill();
+  // elmo (meia esfera mais escura com rebite)
+  ctx.fillStyle='#a01c0e';ctx.beginPath();ctx.arc(x,y-6*s,7.5*s,Math.PI,0);ctx.fill();
+  ctx.fillStyle='#e86048';ctx.beginPath();ctx.arc(x,y-12.5*s,1.8*s,0,TAU);ctx.fill();
+  // visor escuro
+  ctx.fillStyle='#3a0e06';ctx.beginPath();ctx.roundRect(x-5*s,y-6*s,10*s,4*s,2*s);ctx.fill();
+  ctx.fillStyle='#ffdd55';ctx.beginPath();ctx.arc(x-2.2*s,y-4*s,1.1*s,0,TAU);ctx.arc(x+2.2*s,y-4*s,1.1*s,0,TAU);ctx.fill();
+  // espadinha
+  ctx.strokeStyle='#d8dce0';ctx.lineWidth=2.2*s;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(x+9*s,y+2*s);ctx.lineTo(x+15*s,y-8*s);ctx.stroke();
+  ctx.strokeStyle='#7a5228';ctx.lineWidth=2.6*s;
+  ctx.beginPath();ctx.moveTo(x+8*s,y+4*s);ctx.lineTo(x+10.5*s,y);ctx.stroke();
+}
+
+// ---------- REI a pé (chibi, espada + escudo) ----------
+function king(x,y){
+  contact(x,y+22,22,8,.5);
+  const s=1.35;
+  // pés/botas
+  ctx.fillStyle='#5a4028';
+  ctx.beginPath();ctx.ellipse(x-6*s,y+15*s,5*s,3*s,0,0,TAU);ctx.ellipse(x+6*s,y+15*s,5*s,3*s,0,0,TAU);ctx.fill();
+  // pernas curtinhas
+  ctx.strokeStyle='#33589e';ctx.lineWidth=6*s;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(x-5*s,y+7*s);ctx.lineTo(x-6*s,y+13*s);ctx.moveTo(x+5*s,y+7*s);ctx.lineTo(x+6*s,y+13*s);ctx.stroke();
+  // torso: túnica azul com barra dourada
+  const tg=ctx.createLinearGradient(x-9*s,0,x+9*s,0);
+  tg.addColorStop(0,'#6a9be0');tg.addColorStop(.5,'#4a7fd4');tg.addColorStop(1,'#2a4f9e');
+  ctx.fillStyle=tg;
+  ctx.beginPath();ctx.moveTo(x-8*s,y-6*s);ctx.quadraticCurveTo(x-10*s,y+8*s,x-7*s,y+9*s);ctx.lineTo(x+7*s,y+9*s);ctx.quadraticCurveTo(x+10*s,y+8*s,x+8*s,y-6*s);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#d9a93f';ctx.fillRect(x-8*s,y+4*s,16*s,3*s);
+  ctx.fillStyle='#f2c14e';ctx.beginPath();ctx.roundRect(x-2*s,y+3.4*s,4*s,4.2*s,1*s);ctx.fill();
+  // peitoral com coroa estampada
+  ctx.fillStyle='rgba(255,255,255,.85)';
+  ctx.beginPath();ctx.moveTo(x-3.5*s,y+1*s);ctx.lineTo(x-3.5*s,y-2.5*s);ctx.lineTo(x-1.4*s,y-.6*s);ctx.lineTo(x,y-3*s);ctx.lineTo(x+1.4*s,y-.6*s);ctx.lineTo(x+3.5*s,y-2.5*s);ctx.lineTo(x+3.5*s,y+1*s);ctx.closePath();ctx.fill();
+  // BRAÇO do escudo (esquerda)
+  ctx.strokeStyle='#4a7fd4';ctx.lineWidth=5*s;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(x-7*s,y-3*s);ctx.lineTo(x-13*s,y+2*s);ctx.stroke();
+  // escudo redondo azul com aro dourado e coroa
+  const shg=ctx.createRadialGradient(x-17*s-3,y+2*s-3,2,x-17*s,y+2*s,11*s);
+  shg.addColorStop(0,'#6a9be0');shg.addColorStop(.7,'#3a6fd0');shg.addColorStop(1,'#24488f');
+  ctx.fillStyle=shg;ctx.beginPath();ctx.arc(x-17*s,y+2*s,10.5*s,0,TAU);ctx.fill();
+  ctx.strokeStyle='#d9a93f';ctx.lineWidth=2.6*s;ctx.beginPath();ctx.arc(x-17*s,y+2*s,10.5*s,0,TAU);ctx.stroke();
+  ctx.fillStyle='#f2c14e';
+  ctx.beginPath();ctx.moveTo(x-20.5*s,y+5*s);ctx.lineTo(x-20.5*s,y-1*s);ctx.lineTo(x-18.4*s,y+1.4*s);ctx.lineTo(x-17*s,y-2*s);ctx.lineTo(x-15.6*s,y+1.4*s);ctx.lineTo(x-13.5*s,y-1*s);ctx.lineTo(x-13.5*s,y+5*s);ctx.closePath();ctx.fill();
+  // BRAÇO da espada (direita, erguida)
+  ctx.strokeStyle='#f5cf9e';ctx.lineWidth=4.6*s;
+  ctx.beginPath();ctx.moveTo(x+7*s,y-3*s);ctx.lineTo(x+13*s,y-10*s);ctx.stroke();
+  // espada erguida com brilho
+  ctx.save();
+  ctx.translate(x+14*s,y-11*s);ctx.rotate(-.5);
+  ctx.fillStyle='#7a5228';ctx.beginPath();ctx.roundRect(-1.8*s,0,3.6*s,7*s,1.8*s);ctx.fill(); // punho
+  ctx.fillStyle='#d9a93f';ctx.beginPath();ctx.roundRect(-5*s,-2.4*s,10*s,3*s,1.5*s);ctx.fill(); // guarda
+  const swg=ctx.createLinearGradient(-2.2*s,0,2.2*s,0);
+  swg.addColorStop(0,'#ffffff');swg.addColorStop(.5,'#d8dce0');swg.addColorStop(1,'#98a0a8');
+  ctx.fillStyle=swg;
+  ctx.beginPath();ctx.moveTo(-2.4*s,-2.4*s);ctx.lineTo(-2.4*s,-20*s);ctx.lineTo(0,-24*s);ctx.lineTo(2.4*s,-20*s);ctx.lineTo(2.4*s,-2.4*s);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.8)';ctx.lineWidth=1*s;
+  ctx.beginPath();ctx.moveTo(-.8*s,-3*s);ctx.lineTo(-.8*s,-19*s);ctx.stroke();
+  ctx.restore();
+  // cabeça grande
+  const hg=ctx.createRadialGradient(x-3*s,y-14*s,2,x,y-12*s,10*s);
+  hg.addColorStop(0,'#ffe0b8');hg.addColorStop(1,'#e8b888');
+  ctx.fillStyle=hg;ctx.beginPath();ctx.arc(x,y-12*s,9.5*s,0,TAU);ctx.fill();
+  // rosto determinado
+  ctx.fillStyle='#2b2018';
+  ctx.beginPath();ctx.arc(x-3*s,y-13*s,1.5*s,0,TAU);ctx.arc(x+3*s,y-13*s,1.5*s,0,TAU);ctx.fill();
+  ctx.fillStyle='#fff';
+  ctx.beginPath();ctx.arc(x-2.5*s,y-13.5*s,.6*s,0,TAU);ctx.arc(x+3.5*s,y-13.5*s,.6*s,0,TAU);ctx.fill();
+  ctx.strokeStyle='#8a5a2e';ctx.lineWidth=1.2*s;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(x-5*s,y-16.5*s);ctx.lineTo(x-1.5*s,y-15.8*s);ctx.moveTo(x+5*s,y-16.5*s);ctx.lineTo(x+1.5*s,y-15.8*s);ctx.stroke();
+  ctx.strokeStyle='#c8845a';ctx.lineWidth=1.3*s;
+  ctx.beginPath();ctx.arc(x,y-9.5*s,2.4*s,.3,Math.PI-.3);ctx.stroke();
+  ctx.fillStyle='rgba(230,120,90,.35)';
+  ctx.beginPath();ctx.arc(x-6*s,y-10*s,2*s,0,TAU);ctx.arc(x+6*s,y-10*s,2*s,0,TAU);ctx.fill();
+  // COROA dourada
+  const kg=ctx.createLinearGradient(x-8*s,y-26*s,x+8*s,y-18*s);
+  kg.addColorStop(0,'#ffe082');kg.addColorStop(.5,'#f2c14e');kg.addColorStop(1,'#c8901a');
+  ctx.fillStyle=kg;
+  ctx.beginPath();
+  ctx.moveTo(x-7.5*s,y-19*s);ctx.lineTo(x-7.5*s,y-27*s);ctx.lineTo(x-2.5*s,y-21.5*s);ctx.lineTo(x,y-28.5*s);
+  ctx.lineTo(x+2.5*s,y-21.5*s);ctx.lineTo(x+7.5*s,y-27*s);ctx.lineTo(x+7.5*s,y-19*s);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#c62818';ctx.beginPath();ctx.arc(x,y-27.5*s,1.8*s,0,TAU);ctx.fill();
+  ctx.fillStyle='#4adc70';ctx.beginPath();ctx.arc(x-7*s,y-26.5*s,1.3*s,0,TAU);ctx.fill();
+  ctx.fillStyle='#4a8ae0';ctx.beginPath();ctx.arc(x+7*s,y-26.5*s,1.3*s,0,TAU);ctx.fill();
+  // linhas de ação
+  ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineWidth=2.4;ctx.lineCap='round';
+  for(const [a1,r1,r2] of [[-2.2,26,34],[-1.75,29,38],[-1.3,26,34]]){
+    ctx.beginPath();ctx.moveTo(x+Math.cos(a1)*r1,y-8+Math.sin(a1)*r1);ctx.lineTo(x+Math.cos(a1)*r2,y-8+Math.sin(a1)*r2);ctx.stroke();
+  }
+}
+
+// ================= composição da cena =================
+// cercas
+fence(160,58,385,110,7);   // atrás da casa
+fence(374,540,374,706,4);  // direita (vertical na borda)
+fence(5,255,120,300,4);    // perto do rio
+// pinheiros
+pine(360,190,1);pine(330,120,.8);
+pine(370,480,.9);pine(345,830,1.2);pine(300,800,.85);
+pine(30,420,1);pine(65,480,.75);pine(25,640,.9);
+// casa-castelo
+manor(255,215);
+// torres (invulneráveis)
+crossbowTower(100,430,1);
+crossbowTower(300,565,1);
+// moedas pelo caminho
+coin(150,340);coin(128,395);coin(230,505);coin(180,548);coin(120,635);coin(210,660);coin(90,720);
+// horda vermelha em formação vindo do canto inferior esquerdo
+let idx=0;
+for(let row=0;row<5;row++){
+  for(let col2=0;col2<4-((row%2)?1:0);col2++){
+    const bx=28+col2*40+(row%2?20:0)+(rnd()*6-3);
+    const by=612+row*46+(rnd()*6-3);
+    if(bx<385&&by<844) redSoldier(bx,by,1+((idx%7)===0?.18:0));
+    idx++;
+  }
+}
+// rei: sprite real do David, desenhado após o carregamento
+// HUD (pílula única, canto superior direito, como na referência)
+(function hud(){
+  const w=104;
+  const pg=ctx.createLinearGradient(0,14,0,52);
+  pg.addColorStop(0,'#4a4038');pg.addColorStop(1,'#241c14');
+  ctx.fillStyle=pg;ctx.beginPath();ctx.roundRect(390-w-14,14,w,38,19);ctx.fill();
+  ctx.strokeStyle='#141008';ctx.lineWidth=3;ctx.stroke();
+  ctx.font='900 19px system-ui';ctx.textBaseline='middle';ctx.fillStyle='#fff';
+  ctx.fillText('286',390-w+4,34);
+  const mg=ctx.createRadialGradient(390-40,30,2,390-38,33,13);
+  mg.addColorStop(0,'#ffe082');mg.addColorStop(.6,'#f2c14e');mg.addColorStop(1,'#c8901a');
+  ctx.fillStyle=mg;ctx.beginPath();ctx.arc(390-38,33,12,0,TAU);ctx.fill();
+  ctx.fillStyle='#a8701a';
+  ctx.beginPath();ctx.moveTo(390-43,37);ctx.lineTo(390-43,30);ctx.lineTo(390-40.4,33);ctx.lineTo(390-38,29);ctx.lineTo(390-35.6,33);ctx.lineTo(390-33,30);ctx.lineTo(390-33,37);ctx.closePath();ctx.fill();
+})();
+// vinheta suave
+(function(){
+  const v=ctx.createRadialGradient(195,400,240,195,430,640);
+  v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,'rgba(12,32,6,.25)');
+  ctx.fillStyle=v;ctx.fillRect(0,0,390,844);
+})();
+
+// ---- sprite real do rei ----
+const kimg=new Image();
+kimg.onload=()=>{
+  const cell=132; // 724 -> 132px na cena
+  const kx=192, ky=468; // pés do rei no caminho
+  contact(kx,ky,22,8,.5);
+  ctx.drawImage(kimg, kx-cell/2, ky-cell+18, cell, cell);
+  document.title='PRONTO';
+};
+kimg.src='../assets/king/frames/ataque-1.png';
+</script>
+</body></html>

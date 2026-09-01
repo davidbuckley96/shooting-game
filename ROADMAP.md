@@ -153,3 +153,9 @@ Backlog aberto — priorizar com feedback de quem jogar.
   paleta azul/vermelho/verde). Rodada 3 (`art-round3.html`) reproduz a referência em canvas:
   aprovação pendente. Novo desenho de gameplay: TD direcional com lanes, torres invulneráveis,
   rei a pé com espada (→ arco → poderes no futuro), coleta de recursos.
+- **2026-09-01 (5)** — David gerou e subiu 21 quadros do rei (7 tiras x 3). Curadoria:
+  tira 1 descartada (espada na mão esquerda — viola a regra "espada sempre à direita");
+  6 ações válidas catalogadas em `assets/king/` (corre-frente a/b, corre-direita,
+  corre-costas, corre-costas-diag, ataque x3). Sprite integrado à cena-alvo com prova de
+  fidelidade 1:1 (diferença máx. 1/255 por arredondamento de alpha; 0 pixels perceptíveis).
+  Falta: tira virada para a ESQUERDA (espelhar trocaria a mão da espada) — pedir ao David.

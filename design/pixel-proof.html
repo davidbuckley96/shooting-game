@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>body{margin:0}</style></head><body>
+<canvas id="c" width="724" height="724"></canvas>
+<script>
+const ctx=document.getElementById('c').getContext('2d');
+ctx.fillStyle='#808080';ctx.fillRect(0,0,724,724);
+const im=new Image();
+im.onload=()=>{ctx.drawImage(im,0,0);document.title='PRONTO';};
+im.src='../assets/king/frames/ataque-1.png';
+</script></body></html>
