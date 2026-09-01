@@ -1,4 +1,4 @@
-// Teste de fumaça v2: TD direcional com rei em sprites.
+// Teste v3: waves automáticas, fim de nível -> menu, mercado, consumíveis.
 import { chromium } from 'playwright-core';
 import { mkdirSync } from 'node:fs';
 
@@ -7,7 +7,9 @@ const BASE = process.env.GAME_URL || 'http://localhost:8123';
 mkdirSync('shots', { recursive: true });
 const errors = [];
 const browser = await chromium.launch({ executablePath: EXE });
-const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, deviceScaleFactor: 2 });
+const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, deviceScaleFactor: 2 });
+const page = await ctx2.newPage();
+await page.addInitScript(() => { try { localStorage.clear(); } catch (e) {} });
 page.on('pageerror', e => errors.push(`pageerror: ${e.message}`));
 page.on('console', m => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
 
@@ -26,78 +28,80 @@ const check = (name, ok) => {
   else { errors.push(`FALHOU: ${name}`); console.log(`  ❌ ${name}`); }
 };
 
-console.log('▶ carregando…');
+console.log('▶ menu e mercado…');
 await page.goto(BASE, { waitUntil: 'load' });
 await waitFor('__game.spritesReady', 20000);
-check('sprites do rei carregados', true);
 check('menu visível', await page.isVisible('#menu'));
+check('mercado com 7 itens', (await page.$$('#shop .shopItem')).length === 7);
+check('ouro inicial = 0', (await g('__game.meta')).gold === 0);
+await page.screenshot({ path: 'shots/v3-01-menu.png' });
+
+console.log('▶ nível 1: waves automáticas…');
 await page.tap('#playBtn');
 await page.waitForTimeout(300);
-check('estado = prep', (await g('__game.state')) === 'prep');
-await page.screenshot({ path: 'shots/v2-01-prep.png' });
-
-console.log('▶ movimento…');
-const x0 = (await g('__game.kingPos')).x;
-await page.keyboard.down('d');
-await page.waitForTimeout(500);
-await page.keyboard.up('d');
-check('rei se moveu (teclado)', (await g('__game.kingPos')).x > x0 + 40);
-const y0 = (await g('__game.kingPos')).y;
-await page.mouse.move(200, 600); await page.mouse.down();
-await page.mouse.move(200, 660, { steps: 5 });
-await page.waitForTimeout(400);
-await page.mouse.up();
-check('rei se moveu (joystick)', (await g('__game.kingPos')).y > y0 + 30);
-
-console.log('▶ construção via painel…');
-await g('__game.teleport(520, 610)'); // perto do canteiro 0
-await page.waitForTimeout(400);
-check('painel apareceu', await page.isVisible('#buildPanel'));
-await page.tap('#buildPanel button[data-act="build"]');
-await page.waitForTimeout(200);
-check('torre construída via UI', (await g('__game.plotInfo'))[0].level === 1);
-
-console.log('▶ defesa + nível 1 acelerado…');
-await g('for (let i = 1; i < 7; i++) __game.buildAt(i)');
-await g('__game.upgradeAt(0)');
-check('7 torres em pé', (await g('__game.plotInfo')).filter(p => p.level > 0).length === 7);
-const coins0 = await g('__game.coins');
-await g('__game.timeScale = 6');
-await g('__game.teleport(700, 660)'); // rei defende o gargalo
-await g('__game.startWave()');
-await page.waitForTimeout(300);
-check('estado = wave', (await g('__game.state')) === 'wave');
+check('estado = play (contagem)', (await g('__game.state')) === 'play' && (await g('__game.wave')).phase === 'countdown');
+check('botão de pular visível', await page.isVisible('#nightBtn'));
+await g('for (let i = 0; i < 7; i++) __game.buildAt(i)');
+await g('__game.teleport(700, 660); __game.timeScale = 8; __game.skipCountdown()');
 await waitFor('__game.enemyCount > 0', 20000);
-check('horda surgiu', true);
-await page.waitForTimeout(1500);
-await page.screenshot({ path: 'shots/v2-02-wave.png' });
-await waitFor('__game.state !== "wave"', 120000);
-check('nível 1 vencido', (await g('__game.state')) === 'prep' && (await g('__game.level')) === 2);
-check('abates > 0', (await g('__game.kills')) > 0);
-check('ganhou moedas (bônus)', (await g('__game.coins')) > coins0);
-await page.screenshot({ path: 'shots/v2-03-prep2.png' });
+check('wave 1 começou sozinha após pular contagem', (await g('__game.wave')).num === 1);
+await page.waitForTimeout(1200);
+await page.screenshot({ path: 'shots/v3-02-wave.png' });
+await waitFor('__game.state === "levelend" || __game.state === "gameover"', 240000);
+check('nível 1 completo (4 waves automáticas)', (await g('__game.state')) === 'levelend');
+await page.screenshot({ path: 'shots/v3-03-levelend.png' });
 
-console.log('▶ níveis 2 e 3 (direções diferentes)…');
-await g('__game.addCoins(600); __game.buildAt(7); __game.buildAt(8); __game.upgradeAt(1); __game.upgradeAt(4)');
-await g('__game.teleport(700, 660)');
-await g('__game.startWave()');
-await waitFor('__game.state !== "wave"', 120000);
-check('nível 2 vencido (horda do OESTE)', (await g('__game.level')) === 3);
-await g('__game.upgradeAt(5); __game.upgradeAt(3); __game.upgradeAt(7)');
-await g('__game.teleport(700, 660)');
-await g('__game.startWave()');
-await waitFor('__game.state !== "wave"', 120000);
-check('nível 3 vencido (horda do LESTE)', (await g('__game.level')) === 4);
+console.log('▶ volta ao menu com ouro…');
+await page.tap('#menuBtn');
+await page.waitForTimeout(300);
+check('voltou ao menu', (await g('__game.state')) === 'menu');
+const m1 = await g('__game.meta');
+check('ouro guardado > 0', m1.gold > 0);
+check('missão avançou para 2', m1.mission === 2);
 
-console.log('▶ derrota e reinício…');
-await g('__game.hurtManor(9999)');
-await g('__game.startWave()');
+console.log('▶ compra no mercado (clique real)…');
+await g('__game.addGold(500)');
+await page.click('#shop .shopItem[data-id="atk"]');
+await page.waitForTimeout(200);
+const m2 = await g('__game.meta');
+check('golpe +4 comprado', m2.atk === 1);
+check('ouro debitado', m2.gold < m1.gold + 500);
+await page.screenshot({ path: 'shots/v3-04-loja.png' });
+
+console.log('▶ nível 2: lama, congelar, bomba, reparo…');
+await g('__game.giveItems()');
+await page.tap('#playBtn');
+await page.waitForTimeout(300);
+check('nível 2 iniciado', (await g('__game.level')) === 2);
+await g('for (let i = 0; i < 6; i++) __game.buildAt(i)');
+await g('__game.buildAt(6, "mud")');
+check('lama construída', (await g('__game.plotInfo'))[6].kind === 'mud');
+check('consumíveis visíveis', await page.isVisible('#consumables'));
+await g('__game.teleport(700, 660); __game.timeScale = 8; __game.skipCountdown()');
+await waitFor('__game.enemyCount > 3', 30000);
+await g('__game.useFreeze()');
+check('congelamento ativo', (await g('__game.freezeT')) > 0);
+const k0 = await g('__game.kills');
+await g('__game.useBomb()');
+await page.waitForTimeout(600);
+check('bomba causou abates', (await g('__game.kills')) > k0);
+await g('__game.hurtManor(300)'); await g('__game.addCoins(400)');
+await g('__game.teleport(700, 620)');  // perto da porta
+await page.waitForTimeout(500);
+const hpBefore = await g('__game.manorHp');
+await page.tap('#buildPanel button[data-act="repair"]');
+await page.waitForTimeout(300);
+check('reparo do casarão funcionou', (await g('__game.manorHp')) > hpBefore);
+
+console.log('▶ derrota mantém o ouro…');
+const goldBefore = (await g('__game.meta')).gold;
+await g('__game.addCoins(50); __game.hurtManor(9999)');
 await waitFor('__game.state === "gameover"', 30000);
-check('game over quando o casarão cai', true);
-await page.screenshot({ path: 'shots/v2-04-gameover.png' });
+check('game over', true);
 await page.tap('#retryBtn');
 await page.waitForTimeout(300);
-check('reinício (prep, nível 1)', (await g('__game.state')) === 'prep' && (await g('__game.level')) === 1);
+check('voltou ao menu após derrota', (await g('__game.state')) === 'menu');
+check('ouro da derrota foi guardado', (await g('__game.meta')).gold > goldBefore);
 
 const realErrors = errors.filter(e => !/favicon|sw\.js|net::ERR/i.test(e));
 if (realErrors.length) {

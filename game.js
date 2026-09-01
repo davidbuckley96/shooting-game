@@ -113,7 +113,9 @@ const viewh = () => VH / ZOOM;
 const MANOR = { x: 700, y: 420, hp: 400, maxHp: 400 };
 const DOOR = { x: 700, y: 545 };
 
-let state = 'menu';        // menu | prep | wave | gameover
+let state = 'menu';        // menu | play | levelend | gameover
+let waveNum = 0, waveTotal = 4, waveTimer = 0, wavePhase = 'countdown';
+let freezeT = 0;
 let level = 1;
 let coins = 80;
 let timeScale = 1;
@@ -121,6 +123,15 @@ let shake = 0;
 let stats = { kills: 0 };
 let best = 0;
 try { best = parseInt(localStorage.getItem('tinyking.best') || '0', 10) || 0; } catch (e) {}
+
+// ---- meta-progressão persistente (ouro e melhorias compradas no menu) ----
+const META_DEFAULT = { gold: 0, mission: 1, atk: 0, hp: 0, tower3: false, mud: false, repair: false, bomb: 0, freeze: 0 };
+let meta = Object.assign({}, META_DEFAULT);
+try { meta = Object.assign({}, META_DEFAULT, JSON.parse(localStorage.getItem('tinyking.meta') || '{}')); } catch (e) {}
+function saveMeta() { try { localStorage.setItem('tinyking.meta', JSON.stringify(meta)); } catch (e) {} }
+const kingDmg = () => 16 + 4 * meta.atk;
+const KING_RANGE = 125;            // +30% sobre os 95 originais
+const maxTowerLvl = () => meta.tower3 ? 3 : 2;
 
 const king = {
   x: 700, y: 700, hp: 80, maxHp: 80, dead: false, respawn: 0,
@@ -143,7 +154,7 @@ const levelDir = (n) => LEVEL_DIRS[(n - 1) % LEVEL_DIRS.length];
 const plots = [
   [520, 650], [880, 650], [560, 880], [840, 880],
   [300, 780], [1100, 780], [700, 1030], [1040, 470], [360, 470],
-].map(([x, y]) => ({ x, y, level: 0, cd: 0 }));
+].map(([x, y]) => ({ x, y, level: 0, cd: 0, kind: null }));
 
 // decoração fixa
 const decor = { pines: [], rocks: [], flowers: [] };
@@ -177,7 +188,6 @@ const TOWER = {
   cost: 60,
   upCost: lvl => [0, 90, 140][lvl] || 999,
   stats: lvl => ({ dmg: 14 + 10 * (lvl - 1), rate: 0.72 - 0.1 * (lvl - 1), range: 235 + 35 * (lvl - 1) }),
-  MAX: 3,
 };
 
 // ---------------- Entrada: joystick + teclado ----------------
@@ -226,84 +236,157 @@ const $ = id => document.getElementById(id);
 const uiCoins = $('uiCoins'), uiLevel = $('uiNight'), uiManor = $('uiCastle');
 const waveBtn = $('nightBtn'), buildPanel = $('buildPanel'), hintEl = $('hint');
 const menuEl = $('menu'), overEl = $('over'), overText = $('overText'), menuBest = $('menuBest');
-$('playBtn').addEventListener('click', () => { audioCtx(); startGame(); });
-$('retryBtn').addEventListener('click', () => { audioCtx(); startGame(); });
-waveBtn.addEventListener('click', () => { if (state === 'prep') startWave(); });
+const levelEndEl = $('levelEnd'), levelEndText = $('levelEndText');
+const shopEl = $('shop'), uiGold = $('uiGold'), uiMission = $('uiMission');
+const consEl = $('consumables');
+$('playBtn').addEventListener('click', () => { audioCtx(); startLevel(); });
+$('retryBtn').addEventListener('click', () => { audioCtx(); showMenu(); });
+$('menuBtn').addEventListener('click', () => { audioCtx(); showMenu(); });
+waveBtn.addEventListener('click', () => { if (state === 'play' && wavePhase === 'countdown') waveTimer = 0; });
+$('bombBtn').addEventListener('click', () => { audioCtx(); useBomb(); });
+$('freezeBtn').addEventListener('click', () => { audioCtx(); useFreeze(); });
 $('muteBtn').addEventListener('click', () => {
   muted = !muted;
   $('muteBtn').textContent = muted ? '🔇' : '🔊';
 });
 if (best > 0) menuBest.textContent = `🏆 Recorde: nível ${best}`;
 
+// ---- mercado do menu principal ----
+function shopItems() {
+  return [
+    { id: 'atk', icon: '⚔️', nome: `Golpe +4 de dano`, extra: `Nv.${meta.atk}/5`, cost: 40 + 30 * meta.atk, ok: meta.atk < 5,
+      buy: () => meta.atk++ },
+    { id: 'hp', icon: '❤️', nome: `Vida do rei +20`, extra: `Nv.${meta.hp}/5`, cost: 35 + 25 * meta.hp, ok: meta.hp < 5,
+      buy: () => meta.hp++ },
+    { id: 'tower3', icon: '🏰', nome: 'Torre Nível 3', extra: meta.tower3 ? '✓ comprado' : 'permanente', cost: 150, ok: !meta.tower3,
+      buy: () => meta.tower3 = true },
+    { id: 'mud', icon: '🟤', nome: 'Lama pegajosa', extra: meta.mud ? '✓ comprado' : 'construível: atrasa inimigos', cost: 100, ok: !meta.mud,
+      buy: () => meta.mud = true },
+    { id: 'repair', icon: '🔨', nome: 'Reparo do casarão', extra: meta.repair ? '✓ comprado' : 'perto da porta, custa moedas', cost: 120, ok: !meta.repair,
+      buy: () => meta.repair = true },
+    { id: 'bomb', icon: '💣', nome: 'Bomba (consumível)', extra: `x${meta.bomb}/3`, cost: 30, ok: meta.bomb < 3,
+      buy: () => meta.bomb++ },
+    { id: 'freeze', icon: '❄️', nome: 'Congelar (consumível)', extra: `x${meta.freeze}/3`, cost: 35, ok: meta.freeze < 3,
+      buy: () => meta.freeze++ },
+  ];
+}
+function renderShop() {
+  uiGold.textContent = meta.gold;
+  uiMission.textContent = meta.mission;
+  shopEl.innerHTML = shopItems().map(it =>
+    `<button class="shopItem" data-id="${it.id}" ${it.ok && meta.gold >= it.cost ? '' : 'disabled'}>` +
+    `<span class="si-ico">${it.icon}</span><span class="si-nome">${it.nome}<br><small>${it.extra}</small></span>` +
+    `<span class="si-custo">${it.ok ? '💰' + it.cost : '✓'}</span></button>`).join('');
+}
+shopEl.addEventListener('click', e => {
+  const btn = e.target.closest('button[data-id]');
+  if (!btn) return;
+  const it = shopItems().find(i => i.id === btn.dataset.id);
+  if (!it || !it.ok || meta.gold < it.cost) return;
+  meta.gold -= it.cost;
+  it.buy();
+  saveMeta();
+  sfx.upgrade();
+  renderShop();
+});
+function renderConsumables() {
+  const show = state === 'play' && (meta.bomb > 0 || meta.freeze > 0);
+  consEl.classList.toggle('hidden', !show);
+  $('bombBtn').textContent = `💣 ${meta.bomb}`;
+  $('bombBtn').disabled = meta.bomb < 1;
+  $('freezeBtn').textContent = `❄️ ${meta.freeze}`;
+  $('freezeBtn').disabled = meta.freeze < 1;
+}
+renderShop();
+
 // ---------------- Fluxo de jogo ----------------
 let hintT = 0;
 function showHint(txt, secs = 3) { hintEl.textContent = txt; hintEl.classList.remove('hidden'); hintT = secs; }
 
 function resetGame() {
-  level = 1; coins = 80; stats = { kills: 0 };
+  coins = 80; stats = { kills: 0 };
   MANOR.hp = MANOR.maxHp;
+  king.maxHp = 80 + 20 * meta.hp;
   king.x = 700; king.y = 720; king.hp = king.maxHp;
   king.dead = false; king.respawn = 0; king.cd = 0; king.attackT = 0; king.dirKey = 'frente';
-  for (const p of plots) { p.level = 0; p.cd = 0; }
+  for (const p of plots) { p.level = 0; p.cd = 0; p.kind = null; }
+  freezeT = 0;
   enemies = []; bolts = []; coinDrops = []; parts = []; floats = [];
   wavePlan = { queue: [], t: 0 };
   shake = 0;
   cam.x = 700; cam.y = 660;
   renderStatic();
 }
-function startGame() {
-  resetGame(); state = 'prep';
-  menuEl.classList.add('hidden'); overEl.classList.add('hidden');
-  showHint(`⚔️ Nível 1 — inimigos virão do ${levelDir(1).nome}. Construa torres!`, 5);
+function startLevel() {
+  level = meta.mission;
+  resetGame();
+  state = 'play';
+  wavePhase = 'countdown'; waveTimer = 8; waveNum = 0;
+  waveTotal = 4 + (level >= 4 ? 1 : 0);
+  menuEl.classList.add('hidden'); overEl.classList.add('hidden'); levelEndEl.classList.add('hidden');
+  renderStatic();
+  showHint(`⚔️ Nível ${level}: ${waveTotal} waves virão do ${levelDir(level).nome}. Prepare-se!`, 5);
 }
-function startWave() {
-  if (state !== 'prep') return;
-  buildWavePlan(level);
-  state = 'wave';
+function beginWave() {
+  waveNum++;
+  wavePhase = 'active';
+  buildWavePlan(level, waveNum);
   sfx.horn();
-  showHint(`🚨 Nível ${level}: horda vindo do ${levelDir(level).nome}!`, 3);
+  showHint(`🚨 Wave ${waveNum}/${waveTotal}!`, 2.5);
 }
-function endWave() {
+function levelComplete() {
   sfx.clear();
-  const bonus = 25 + 6 * level;
+  const bonus = 30 + 10 * level;
   coins += bonus;
-  addFloat(MANOR.x, MANOR.y - 130, `+${bonus} 🪙 bônus`, '#ffe066');
+  meta.gold += coins;                       // moedas não gastas viram ouro
+  if (level >= meta.mission) meta.mission = level + 1;
   if (level > best) { best = level; try { localStorage.setItem('tinyking.best', String(best)); } catch (e) {} }
-  level++;
-  king.dead = false; king.respawn = 0; king.hp = king.maxHp;
-  state = 'prep';
-  renderStatic(); // novo caminho do próximo nível
-  showHint(`✅ Nível vencido! Nível ${level} virá do ${levelDir(level).nome}`, 4);
+  saveMeta();
+  state = 'levelend';
+  levelEndText.innerHTML =
+    `Você defendeu o casarão nas <b>${waveTotal}</b> waves!<br>` +
+    `Inimigos derrotados: <b>${stats.kills}</b><br>` +
+    `💰 Ouro guardado: <b>+${coins}</b> (bônus de ${bonus} incluído)<br><br>` +
+    `Gaste no mercado do menu para ficar mais forte. 💪`;
+  levelEndEl.classList.remove('hidden');
 }
 function gameOver() {
   state = 'gameover';
   sfx.lose();
-  const survived = level - 1;
+  meta.gold += coins;                       // o que coletou fica guardado
+  saveMeta();
   overText.innerHTML =
-    `O casarão caiu no nível <b>${level}</b>.<br>` +
-    `Níveis vencidos: <b>${survived}</b> · Inimigos derrotados: <b>${stats.kills}</b><br>` +
+    `O casarão caiu no nível <b>${level}</b>, wave <b>${waveNum}/${waveTotal}</b>.<br>` +
+    `Inimigos derrotados: <b>${stats.kills}</b> · 💰 Ouro guardado: <b>+${coins}</b><br>` +
     `🏆 Recorde: nível <b>${best}</b><br><br>` +
-    `<i>O "jogador" daqueles anúncios teria ido bem pior. 😏</i>`;
+    `<i>Melhore o rei no mercado e tente de novo!</i>`;
   overEl.classList.remove('hidden');
+}
+function showMenu() {
+  state = 'menu';
+  overEl.classList.add('hidden'); levelEndEl.classList.add('hidden');
+  menuEl.classList.remove('hidden');
+  renderShop();
 }
 
 // ---------------- Waves ----------------
-function buildWavePlan(n) {
+function buildWavePlan(n, w) {
+  const força = n + w;                      // dificuldade cresce por nível E por wave
   const pool = [];
-  const soldiers = 8 + Math.ceil(n * 4);
-  const fasts = n >= 2 ? Math.ceil(n * 1.5) : 0;
-  const brutes = n >= 3 ? Math.floor(n / 2) + 1 : 0;
+  const soldiers = 3 + Math.ceil(força * 1.7);
+  const fasts = força >= 4 ? Math.ceil(força / 3) : 0;
+  const brutes = w >= 3 ? Math.floor(força / 4) : 0;
   for (let i = 0; i < soldiers; i++) pool.push('soldado');
   for (let i = 0; i < fasts; i++) pool.push('rapido');
   for (let i = 0; i < brutes; i++) pool.push('bruto');
   for (let i = pool.length - 1; i > 0; i--) { const j = randi(0, i); [pool[i], pool[j]] = [pool[j], pool[i]]; }
   const evts = [];
-  let t = 1.2;
+  let t = 0.8;
   while (pool.length) {
     evts.push({ t, types: pool.splice(0, randi(3, 5)) });
-    t += Math.max(0.8, rand(1.4, 2.0) - n * 0.04);
+    t += Math.max(0.8, rand(1.3, 1.9) - força * 0.03);
   }
-  if (n % 5 === 0) evts.push({ t: t + 1.5, types: ['chefe'] });
+  if (w === waveTotal && n >= 2) evts.push({ t: t + 1.5, types: ['chefe'] });
   wavePlan = { queue: evts, t: 0 };
 }
 function makeEnemy(type, n) {
@@ -343,16 +426,52 @@ function dropCoins(x, y, val) {
 }
 
 // ---------------- Construção ----------------
-function tryBuild(p) {
-  if (p.level > 0 || coins < TOWER.cost) return false;
-  coins -= TOWER.cost; p.level = 1; p.cd = 0;
+const MUD_COST = 30;
+function tryBuild(p, kind = 'tower') {
+  if (p.kind) return false;
+  const cost = kind === 'mud' ? MUD_COST : TOWER.cost;
+  if (coins < cost || (kind === 'mud' && !meta.mud)) return false;
+  coins -= cost; p.kind = kind; p.level = 1; p.cd = 0;
   sfx.build();
-  addParts(p.x, p.y - 20, '#cfd4d8', 14, 100, 0.6, 3);
+  addParts(p.x, p.y - 20, kind === 'mud' ? '#8a6b42' : '#cfd4d8', 14, 100, 0.6, 3);
   renderStatic(); panelSig = '';
   return true;
 }
+function tryRepairManor() {
+  const missing = MANOR.maxHp - MANOR.hp;
+  if (!meta.repair || missing < 1) return false;
+  const cost = Math.ceil(missing * 0.5);
+  if (coins < cost) return false;
+  coins -= cost; MANOR.hp = MANOR.maxHp;
+  sfx.build();
+  addParts(DOOR.x, DOOR.y - 30, '#9adcff', 16, 110, 0.6, 3);
+  panelSig = '';
+  return true;
+}
+// consumíveis
+function useBomb() {
+  if (meta.bomb < 1 || state !== 'play' || king.dead) return false;
+  meta.bomb--; saveMeta();
+  addParts(king.x, king.y, '#ffae42', 40, 260, 0.8, 5);
+  addParts(king.x, king.y, '#fff', 20, 180, 0.5, 3);
+  shake = 10;
+  beep(60, .4, 'sawtooth', .3, -20);
+  for (const e of enemies) if (dist(king.x, king.y, e.x, e.y) < 200) e.hp -= 70;
+  renderConsumables();
+  return true;
+}
+function useFreeze() {
+  if (meta.freeze < 1 || state !== 'play') return false;
+  meta.freeze--; saveMeta();
+  freezeT = 5;
+  addParts(king.x, king.y, '#9adcff', 30, 220, 0.7, 4);
+  beep(1200, .3, 'triangle', .15, -600);
+  showHint('❄️ Inimigos congelados!', 2);
+  renderConsumables();
+  return true;
+}
 function tryUpgrade(p) {
-  if (p.level < 1 || p.level >= TOWER.MAX) return false;
+  if (p.kind !== 'tower' || p.level >= maxTowerLvl()) return false;
   const cost = TOWER.upCost(p.level);
   if (coins < cost) return false;
   coins -= cost; p.level++;
@@ -404,19 +523,19 @@ function update(dt) {
     king.cd -= dt;
     king.attackT = Math.max(0, king.attackT - dt);
     // ataque em arco (cleave): acerta todos no alcance à frente
-    const tgt = nearestEnemy(king.x, king.y, 95);
+    const tgt = nearestEnemy(king.x, king.y, KING_RANGE);
     if (tgt && king.cd <= 0) {
       king.cd = 0.55; king.attackT = 0.38;
       king.attackDir = Math.atan2(tgt.y - king.y, tgt.x - king.x);
       let hits = 0;
       for (const e of enemies) {
         const d = dist(king.x, king.y, e.x, e.y);
-        if (d > 100 + e.r) continue;
+        if (d > KING_RANGE + 8 + e.r) continue;
         const a = Math.atan2(e.y - king.y, e.x - king.x);
         let da = Math.abs(a - king.attackDir);
         if (da > Math.PI) da = TAU - da;
         if (da < 1.25) {
-          e.hp -= 16; hits++;
+          e.hp -= kingDmg(); hits++;
           const kb = 16, dd = Math.max(1, d);
           e.x += (e.x - king.x) / dd * kb; e.y += (e.y - king.y) / dd * kb;
           addParts(e.x, e.y, '#fff', 3, 90, 0.25, 2);
@@ -426,13 +545,25 @@ function update(dt) {
     }
   }
 
-  // --- spawns da wave ---
-  if (state === 'wave') {
-    wavePlan.t += dt;
-    while (wavePlan.queue.length && wavePlan.queue[0].t <= wavePlan.t) {
-      for (const ty of wavePlan.queue.shift().types) enemies.push(makeEnemy(ty, level));
+  // --- sistema de waves automáticas ---
+  freezeT = Math.max(0, freezeT - dt);
+  if (state === 'play') {
+    if (wavePhase === 'countdown') {
+      waveTimer -= dt;
+      if (waveTimer <= 0) beginWave();
+    } else {
+      wavePlan.t += dt;
+      while (wavePlan.queue.length && wavePlan.queue[0].t <= wavePlan.t) {
+        for (const ty of wavePlan.queue.shift().types) enemies.push(makeEnemy(ty, level));
+      }
+      if (!wavePlan.queue.length && enemies.length === 0) {
+        if (waveNum >= waveTotal) { levelComplete(); return; }
+        wavePhase = 'countdown'; waveTimer = 6;
+        const heal = Math.round(king.maxHp * .35);
+        king.hp = Math.min(king.maxHp, king.hp + heal);
+        showHint(`✅ Wave ${waveNum} vencida! Próxima em instantes…`, 2.5);
+      }
     }
-    if (!wavePlan.queue.length && enemies.length === 0) { endWave(); return; }
   }
 
   // --- inimigos: seguir caminho, bater no rei se ele encostar, bater no casarão na porta ---
@@ -448,21 +579,36 @@ function update(dt) {
       continue;
     }
     e.bob += dt * 11; e.cd -= dt;
-    // rei encostado? briga com ele
-    if (!king.dead && dist(king.x, king.y, e.x, e.y) < e.r + 26) {
-      e.face = king.x > e.x ? 1 : -1;
-      if (e.cd <= 0) {
-        e.cd = 0.9;
-        king.hp -= e.dmg;
-        addParts(king.x, king.y - 20, '#ff7043', 5, 90, 0.3, 2);
-        sfx.hurt(); shake = Math.max(shake, 3);
-        if (king.hp <= 0) {
-          king.dead = true; king.respawn = 5;
-          addParts(king.x, king.y, '#ffd23e', 22, 150, 0.8, 3);
-          showHint('👑 O rei caiu! Voltando ao casarão…', 3);
+    // velocidade efetiva: congelamento e lama atrasam
+    let spd = e.spd;
+    if (freezeT > 0) spd *= 0.3;
+    for (const p of plots) {
+      if (p.kind === 'mud' && dist2(e.x, e.y, p.x, p.y) < 115 * 115) { spd *= 0.45; break; }
+    }
+    // rei por perto? PERSEGUE (nada de apanhar de graça à distância)
+    if (!king.dead) {
+      const dk = dist(king.x, king.y, e.x, e.y);
+      if (dk < e.r + 32) {
+        e.face = king.x > e.x ? 1 : -1;
+        if (e.cd <= 0) {
+          e.cd = 0.9;
+          king.hp -= e.dmg;
+          addParts(king.x, king.y - 20, '#ff7043', 5, 90, 0.3, 2);
+          sfx.hurt(); shake = Math.max(shake, 3);
+          if (king.hp <= 0) {
+            king.dead = true; king.respawn = 5;
+            addParts(king.x, king.y, '#ffd23e', 22, 150, 0.8, 3);
+            showHint('👑 O rei caiu! Voltando ao casarão…', 3);
+          }
         }
+        continue; // encostado, brigando
       }
-      continue; // parado brigando
+      if (dk < 185 && !e.atDoor) {
+        e.x += (king.x - e.x) / dk * spd * dt;
+        e.y += (king.y - e.y) / dk * spd * dt;
+        e.face = king.x > e.x ? 1 : -1;
+        continue; // caçando o rei
+      }
     }
     if (e.atDoor) {
       if (e.cd <= 0) {
@@ -480,15 +626,15 @@ function update(dt) {
       e.wp++;
       if (e.wp >= path.length) e.atDoor = true;
     } else {
-      e.x += (wx - e.x) / d * e.spd * dt;
-      e.y += (wy - e.y) / d * e.spd * dt;
+      e.x += (wx - e.x) / d * spd * dt;
+      e.y += (wy - e.y) / d * spd * dt;
       e.face = wx > e.x ? 1 : -1;
     }
   }
 
   // --- torres ---
   for (const p of plots) {
-    if (p.level < 1) continue;
+    if (p.kind !== 'tower') continue;
     p.cd -= dt;
     if (p.cd > 0) continue;
     const st = TOWER.stats(p.level);
@@ -583,32 +729,59 @@ function nearPlot() {
   return bp;
 }
 function refreshPanel() {
-  const p = (state === 'prep' || state === 'wave') ? nearPlot() : null;
+  if (state !== 'play' || king.dead) {
+    if (panelSig !== 'off') { panelSig = 'off'; buildPanel.classList.add('hidden'); }
+    return;
+  }
+  // perto da porta do casarão: reparo (se comprado)
+  const nearDoor = dist(king.x, king.y, DOOR.x, DOOR.y) < 120;
+  const missing = MANOR.maxHp - MANOR.hp;
+  if (nearDoor && meta.repair && missing >= 1) {
+    const cost = Math.ceil(missing * 0.5);
+    const sig2 = `rep|${cost}|${coins >= cost ? 1 : 0}`;
+    if (sig2 !== panelSig) {
+      panelSig = sig2;
+      buildPanel.innerHTML = `<span class="lbl">🏠 Casarão</span>` +
+        `<button data-act="repair" ${coins >= cost ? '' : 'disabled'}>🔨 Reparar<br>🪙${cost}</button>`;
+      buildPanel.classList.remove('hidden');
+    }
+    return;
+  }
+  const p = nearPlot();
   if (!p) {
     if (panelSig !== 'off') { panelSig = 'off'; buildPanel.classList.add('hidden'); }
     return;
   }
   const idx = plots.indexOf(p);
   let sig;
-  if (p.level === 0) {
-    const ok = coins >= TOWER.cost;
-    sig = `e${idx}|${ok ? 1 : 0}`;
+  if (!p.kind) {
+    const okT = coins >= TOWER.cost;
+    const okM = meta.mud && coins >= MUD_COST;
+    sig = `e${idx}|${okT ? 1 : 0}|${okM ? 1 : 0}|${meta.mud ? 1 : 0}`;
     if (sig !== panelSig) {
       panelSig = sig;
       buildPanel.innerHTML = `<span class="lbl">Canteiro:</span>` +
-        `<button data-act="build" ${ok ? '' : 'disabled'}>🏰 Torre<br>🪙${TOWER.cost}</button>`;
+        `<button data-act="build" ${okT ? '' : 'disabled'}>🏰 Torre<br>🪙${TOWER.cost}</button>` +
+        (meta.mud ? `<button data-act="mud" ${okM ? '' : 'disabled'}>🟤 Lama<br>🪙${MUD_COST}</button>` : '');
+      buildPanel.classList.remove('hidden');
+    }
+  } else if (p.kind === 'mud') {
+    sig = `m${idx}`;
+    if (sig !== panelSig) {
+      panelSig = sig;
+      buildPanel.innerHTML = `<span class="lbl">🟤 Lama pegajosa</span>`;
       buildPanel.classList.remove('hidden');
     }
   } else {
-    const canUp = p.level < TOWER.MAX;
+    const canUp = p.level < maxTowerLvl();
     const cost = TOWER.upCost(p.level);
-    sig = `b${idx}|${p.level}|${canUp && coins >= cost ? 1 : 0}`;
+    sig = `b${idx}|${p.level}|${canUp && coins >= cost ? 1 : 0}|${maxTowerLvl()}`;
     if (sig !== panelSig) {
       panelSig = sig;
       buildPanel.innerHTML = `<span class="lbl">🏰 Torre Nv.${p.level}</span>` +
         (canUp
           ? `<button data-act="up" ${coins >= cost ? '' : 'disabled'}>⬆️ Melhorar<br>🪙${cost}</button>`
-          : `<span class="lbl">⭐ Máx</span>`);
+          : `<span class="lbl">${meta.tower3 ? '⭐ Máx' : '🔒 Nv.3 no mercado'}</span>`);
       buildPanel.classList.remove('hidden');
     }
   }
@@ -616,18 +789,21 @@ function refreshPanel() {
 buildPanel.addEventListener('click', e => {
   const btn = e.target.closest('button');
   if (!btn) return;
+  if (btn.dataset.act === 'repair') { tryRepairManor(); return; }
   const p = nearPlot();
   if (!p) return;
-  if (btn.dataset.act === 'build') tryBuild(p);
+  if (btn.dataset.act === 'build') tryBuild(p, 'tower');
+  else if (btn.dataset.act === 'mud') tryBuild(p, 'mud');
   else if (btn.dataset.act === 'up') tryUpgrade(p);
 });
 function updateUI(dt) {
   uiCoins.textContent = coins;
-  uiLevel.textContent = level;
   uiManor.textContent = Math.max(0, Math.round(MANOR.hp / MANOR.maxHp * 100)) + '%';
-  const showBtn = state === 'prep';
+  uiLevel.textContent = `${level} · W${Math.max(waveNum, 1)}/${waveTotal}`;
+  const showBtn = state === 'play' && wavePhase === 'countdown';
   waveBtn.classList.toggle('hidden', !showBtn);
-  if (showBtn) waveBtn.textContent = `⚔️ Iniciar Nível ${level} (${levelDir(level).nome})`;
+  if (showBtn) waveBtn.textContent = `⏩ Wave ${waveNum + 1}/${waveTotal} em ${Math.ceil(waveTimer)}s (${levelDir(level).nome}) — pular`;
+  renderConsumables();
   if (hintT > 0) { hintT -= dt; if (hintT <= 0) hintEl.classList.add('hidden'); }
   refreshPanel();
 }
@@ -894,9 +1070,17 @@ function renderStatic() {
   for (const r0 of decor.rocks) drawRock(g, r0);
   // bases dos canteiros
   for (const p of plots) {
+    if (p.kind === 'mud') {
+      const mg = g.createRadialGradient(p.x, p.y + 8, 10, p.x, p.y + 8, 115);
+      mg.addColorStop(0, 'rgba(110,80,45,.85)'); mg.addColorStop(.75, 'rgba(110,80,45,.5)'); mg.addColorStop(1, 'rgba(110,80,45,0)');
+      g.fillStyle = mg; g.beginPath(); g.ellipse(p.x, p.y + 8, 115, 74, 0, 0, TAU); g.fill();
+      g.fillStyle = 'rgba(70,48,25,.5)';
+      for (let i = 0; i < 7; i++) g.beginPath(), g.ellipse(p.x + (drnd() * 140 - 70), p.y + 8 + (drnd() * 80 - 40), 9 + drnd() * 8, 5 + drnd() * 4, drnd(), 0, TAU), g.fill();
+      continue;
+    }
     g.fillStyle = 'rgba(160,130,80,.35)';
     g.beginPath(); g.ellipse(p.x, p.y + 8, 34, 20, 0, 0, TAU); g.fill();
-    if (p.level === 0) {
+    if (!p.kind) {
       g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 3; g.setLineDash([9, 8]);
       g.beginPath(); g.ellipse(p.x, p.y + 8, 34, 20, 0, 0, TAU); g.stroke();
       g.setLineDash([]);
@@ -931,7 +1115,7 @@ function render() {
     ctx.beginPath(); ctx.arc(c.x, c.y, 4.2, 0, TAU); ctx.stroke();
   }
   // seta da direção do próximo nível (fase de preparação)
-  if (state === 'prep') {
+  if (state === 'play' && wavePhase === 'countdown') {
     const path = levelDir(level).path;
     const [ax, ay] = path[0];
     // seta perto do casarão apontando PARA a porta (mostra de onde a horda vem)
@@ -951,7 +1135,7 @@ function render() {
   dseed = 31;
   const drawables = [];
   drawables.push({ y: MANOR.y + 66, fn: () => drawManor(ctx) });
-  for (const p of plots) if (p.level > 0) drawables.push({ y: p.y + 28, fn: () => drawTower(ctx, p.x, p.y, p.level) });
+  for (const p of plots) if (p.kind === 'tower') drawables.push({ y: p.y + 28, fn: () => drawTower(ctx, p.x, p.y, p.level) });
   for (const t of decor.pines) drawables.push({ y: t.y + 6, fn: () => drawPine(ctx, t.x, t.y, t.s) });
   for (const e of enemies) drawables.push({ y: e.y + 9 * e.s, fn: () => drawEnemy(ctx, e) });
   if (state !== 'menu') drawables.push({ y: king.dead ? -9999 : king.y + 13, fn: () => drawKing(ctx) });
@@ -1006,7 +1190,7 @@ let last = performance.now();
 function frame(now) {
   let dt = Math.min((now - last) / 1000, 0.05) * timeScale;
   last = now;
-  if (state === 'prep' || state === 'wave') {
+  if (state === 'play') {
     const steps = Math.max(1, Math.ceil(dt / 0.033));
     const h = dt / steps;
     for (let i = 0; i < steps; i++) {
@@ -1038,17 +1222,25 @@ window.__game = {
   get kingPos() { return { x: king.x, y: king.y }; },
   get kingHp() { return king.hp; },
   get kills() { return stats.kills; },
-  get plotInfo() { return plots.map(p => ({ level: p.level })); },
+  get plotInfo() { return plots.map(p => ({ level: p.level, kind: p.kind })); },
+  get wave() { return { num: waveNum, total: waveTotal, phase: wavePhase, timer: waveTimer }; },
+  get meta() { return JSON.parse(JSON.stringify(meta)); },
+  get freezeT() { return freezeT; },
   get spritesReady() { return spritesReady; },
   get cam() { return { x: cam.x, y: cam.y }; },
   get view() { return { vw: VW, vh: VH, dpr: DPR, cw: canvas.width, rect: canvas.getBoundingClientRect().width }; },
   get timeScale() { return timeScale; },
   set timeScale(v) { timeScale = clamp(v, 0.1, 20); },
   addCoins(n) { coins += n; },
-  buildAt(i) { const p = plots[i]; if (p && p.level === 0) { coins += TOWER.cost; return tryBuild(p); } return false; },
+  buildAt(i, kind = 'tower') { const p = plots[i]; if (p && !p.kind) { coins += kind === 'mud' ? MUD_COST : TOWER.cost; return tryBuild(p, kind); } return false; },
   upgradeAt(i) { const p = plots[i]; if (p && p.level > 0) { coins += TOWER.upCost(p.level); return tryUpgrade(p); } return false; },
   teleport(x, y) { king.x = x; king.y = y; },
-  startWave() { if (state === 'prep') startWave(); },
+  skipCountdown() { if (state === 'play' && wavePhase === 'countdown') waveTimer = 0; },
+  addGold(n) { meta.gold += n; saveMeta(); renderShop(); },
+  giveItems() { meta.bomb = 3; meta.freeze = 3; meta.mud = true; meta.repair = true; saveMeta(); renderConsumables(); },
+  resetMeta() { meta = Object.assign({}, META_DEFAULT); saveMeta(); renderShop(); },
+  useBomb, useFreeze,
+  goMenu() { showMenu(); },
   killAll() { for (const e of enemies) e.hp = 0; },
   hurtManor(n) { MANOR.hp -= n; },
 };

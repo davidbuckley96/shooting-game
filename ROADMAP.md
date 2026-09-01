@@ -167,3 +167,10 @@ Backlog aberto — priorizar com feedback de quem jogar.
   camada estática pré-renderizada, zoom tático 0.6x, 17 testes verdes. Bugs corrigidos no
   processo: canvas sem style.width (câmera 'deslocada' em telas retina), seta de direção fora
   da tela, balanceamento nível 3. Republicado no link de teste (sprites embutidos, ~2MB).
+- **2026-09-01 (7)** — v3 (feedback do David): níveis agora têm 4-5 WAVES AUTOMÁTICAS
+  (contagem entre elas, botão só para pular espera, escalada por nível+wave); fim de nível
+  volta ao MENU e moedas não gastas viram OURO persistente; MERCADO no menu com 7 itens
+  (golpe +dano x5, vida +20 x5, Torre Nv.3, lama que atrasa, reparo do casarão, bomba x3,
+  congelar x3 — consumíveis com botões no jogo); alcance do rei +30% (95->125); bug do
+  "ataque covarde" corrigido: inimigos agora PERSEGUEM o rei no raio de 185px (kiting real).
+  21 testes verdes. Republicado no link.
