@@ -34,7 +34,7 @@ AMANHECER: renda das fazendas → dificuldade sobe → repete até o castelo cai
 
 ---
 
-## FASE 0 — Fundação 🔨
+## FASE 0 — Fundação ✅
 
 Infraestrutura do projeto e do ambiente de desenvolvimento/teste.
 
@@ -42,35 +42,35 @@ Infraestrutura do projeto e do ambiente de desenvolvimento/teste.
 - [x] Pesquisa de referência: arquétipos dos anúncios do Kingshot documentados
 - [x] Decisão de tecnologia (HTML5/Canvas + Capacitor/APK) — ver Decisões, abaixo
 - [x] Esqueleto do projeto: `index.html`, UI base (overlays, painéis), `manifest.json`, `sw.js`, `icon.svg`
-- [ ] Pipeline de teste automatizado (Playwright + Chromium headless: erros de console, screenshots, bot que joga sozinho)
-- [ ] Primeiro commit/push e estrutura de branches definida
+- [x] Pipeline de teste automatizado (Playwright + Chromium headless: erros de console, screenshots, bot que joga sozinho) — `npm test`
+- [x] Primeiro commit/push e estrutura de branches definida (`main`)
 
-## FASE 1 — Protótipo jogável (vertical slice) 🔨
+## FASE 1 — Protótipo jogável (vertical slice) ✅
 
 O núcleo do jogo funcionando de ponta a ponta, ainda sem polimento.
 
-- [ ] Loop de jogo (game loop, câmera que segue o rei, mundo maior que a tela)
-- [ ] Controle do rei por joystick virtual de toque (+ teclado no desktop p/ testes)
-- [ ] Castelo central com HP; derrota quando cai
-- [ ] Canteiros de construção + painel de construir (torre 🏹, fazenda 🌾, quartel ⛺)
-- [ ] Ciclo dia/noite com transição visual (escurecer, iluminação ao redor de torres/rei)
-- [ ] Inimigos com IA simples (avançar, atacar estruturas/rei) e waves noturnas
-- [ ] Combate: torres atiram flechas, soldados lutam, rei ataca de perto
-- [ ] Economia: moedas por abate + renda de fazendas ao amanhecer
-- [ ] Game over + reinício + contagem de noites sobrevividas
-- [ ] **Marco: dá para jogar 3+ noites seguidas sem bugs** (validado por teste automatizado)
+- [x] Loop de jogo (game loop, câmera que segue o rei, mundo maior que a tela)
+- [x] Controle do rei por joystick virtual de toque (+ teclado no desktop p/ testes)
+- [x] Castelo central com HP; derrota quando cai
+- [x] Canteiros de construção + painel de construir (torre 🏹, fazenda 🌾, quartel ⛺)
+- [x] Ciclo dia/noite com transição visual (escurecer, iluminação ao redor de torres/rei)
+- [x] Inimigos com IA simples (avançar, atacar estruturas/rei) e waves noturnas
+- [x] Combate: torres atiram flechas, soldados lutam, rei ataca de perto
+- [x] Economia: moedas por abate + renda de fazendas ao amanhecer
+- [x] Game over + reinício + contagem de noites sobrevividas
+- [x] **Marco: dá para jogar 3+ noites seguidas sem bugs** (validado por teste automatizado)
 
-## FASE 2 — Conteúdo & profundidade ⬜
+## FASE 2 — Conteúdo & profundidade 🔨
 
 Transformar o protótipo em jogo com decisões interessantes.
 
-- [ ] Upgrades de estruturas (níveis 1→3, custos e efeitos crescentes)
-- [ ] Reparo de estruturas danificadas
-- [ ] 3+ tipos de inimigos (rápido/fraco, lento/tanque, à distância?) + **chefão** a cada 5 noites
+- [x] Upgrades de estruturas (níveis 1→3, custos e efeitos crescentes)
+- [x] Reparo de estruturas danificadas
+- [x] 3 tipos de inimigos (goblin rápido, bruto tanque, **chefão** a cada 5 noites) — falta avaliar inimigo à distância
 - [ ] Curva de dificuldade e balanceamento da economia (planilha de tuning + simulações automáticas)
 - [ ] Variedade de mapa (obstáculos, pontos de spawn variados)
 - [ ] Habilidade especial do rei (ex.: investida da cavalaria com cooldown)
-- [ ] Recorde persistente (localStorage) e estatísticas de fim de partida
+- [x] Recorde persistente (localStorage) e estatísticas de fim de partida (abates/noites)
 
 ## FASE 3 — Polimento (game feel, arte e som) ⬜
 
@@ -123,10 +123,16 @@ Backlog aberto — priorizar com feedback de quem jogar.
 
 ## 🐞 Bugs conhecidos
 
-*(vazio — registrar aqui todo bug encontrado e não corrigido na hora)*
+- (polimento) Centro do mapa visualmente vazio — adicionar decoração perto do castelo (Fase 3)
+- (polimento) O "+" dos canteiros vazios continua visível à noite — esconder ou suavizar (Fase 3)
 
 ## 📓 Diário de desenvolvimento
 
 - **2026-09-01** — Pesquisa dos anúncios concluída; tecnologia e distribuição decididas;
   esqueleto do projeto criado (HTML/UI/PWA); início do código do jogo (`game.js` **WIP —
   incompleto, ainda não roda**); criação deste roadmap.
+- **2026-09-01 (2)** — Fases 0 e 1 CONCLUÍDAS: motor completo (~1050 linhas), pipeline
+  de testes com 18 verificações (2x verde, sem erros de console), 3 noites jogadas por bot
+  em velocidade 6x, screenshots verificados. Balanceamento inicial ajustado após playtests
+  automatizados (torres +DPS, castelo 400 HP, horda inicial menor). Upgrades, reparo,
+  brutos e chefões já implementados (adiantando a Fase 2).
