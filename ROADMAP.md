@@ -69,12 +69,15 @@ Transformar o protótipo em jogo com decisões interessantes.
 - [x] 3 tipos de inimigos (goblin rápido, bruto tanque, **chefão** a cada 5 noites) — falta avaliar inimigo à distância
 - [ ] Curva de dificuldade e balanceamento da economia (planilha de tuning + simulações automáticas)
 - [ ] Variedade de mapa (obstáculos, pontos de spawn variados)
-- [ ] **PIVÔ DE GAMEPLAY (decisão do David, 2026-09-01):** tower defense direcional —
-      inimigos vêm de UMA direção específica a cada nível, seguindo caminho/lane
-- [ ] **Torres NÃO atacáveis** pelos inimigos (invulneráveis); alvo dos inimigos é o castelo/casarão
-- [ ] **Rei a pé** (cavalo removido), começa com ESPADA (melee); progressão futura: arco → poderes
-- [ ] Rei também coleta recursos (moedas no mapa)
-- [ ] **Hordas maiores** para viabilizar kiting (rebalancear waves/economia junto)
+- [x] **PIVÔ DE GAMEPLAY implementado:** tower defense direcional — inimigos vêm de UMA
+      direção por nível (6 direções em rotação), seguindo caminho com waypoints
+- [x] **Torres invulneráveis** (bestas), alvo dos inimigos é o casarão; 9 canteiros fixos
+- [x] **Rei a pé em SPRITES** (arte do David): animação por direção (frente/costas/direita/
+      diagonais), ataque em ARCO (cleave acerta múltiplos inimigos), knockback
+- [x] Rei coleta moedas dos abates (ímã) — economia só de combate + bônus por nível
+- [x] **Hordas maiores** (3 tipos + chefão a cada 5 níveis) — kiting viável
+- [ ] Falta: sprite do rei virado à ESQUERDA (usa frente como quebra-galho) — David vai gerar
+- [ ] Progressão futura do rei: arco → poderes
 - [ ] Habilidade especial do rei (ex.: investida da cavalaria com cooldown)
 - [x] Recorde persistente (localStorage) e estatísticas de fim de partida (abates/noites)
 
@@ -159,3 +162,8 @@ Backlog aberto — priorizar com feedback de quem jogar.
   corre-costas, corre-costas-diag, ataque x3). Sprite integrado à cena-alvo com prova de
   fidelidade 1:1 (diferença máx. 1/255 por arredondamento de alpha; 0 pixels perceptíveis).
   Falta: tira virada para a ESQUERDA (espelhar trocaria a mão da espada) — pedir ao David.
+- **2026-09-01 (6)** — MOTOR v2 COMPLETO: reescrita para TD direcional com sprites do rei
+  (máquina de animação por direção + ataque), casarão/torres/inimigos no estilo da referência,
+  camada estática pré-renderizada, zoom tático 0.6x, 17 testes verdes. Bugs corrigidos no
+  processo: canvas sem style.width (câmera 'deslocada' em telas retina), seta de direção fora
+  da tela, balanceamento nível 3. Republicado no link de teste (sprites embutidos, ~2MB).
