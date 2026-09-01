@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Tiny King — Defesa do Reino</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
+<meta name="theme-color" content="#3a8f3f">
+<style>
+  html,body{margin:0;padding:0;overflow:hidden;background:#6db84c;height:100%;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  canvas#game{display:block;position:fixed;inset:0;touch-action:none}
+  .pill{background:rgba(20,30,20,.72);color:#fff;border-radius:999px;padding:6px 12px;
+    font-weight:700;font-size:14px;display:flex;align-items:center;gap:5px;white-space:nowrap}
+  #topbar{position:fixed;top:calc(8px + env(safe-area-inset-top));left:0;right:0;
+    display:flex;justify-content:center;gap:8px;pointer-events:none;z-index:5}
+  #muteBtn{position:fixed;top:calc(8px + env(safe-area-inset-top));right:10px;z-index:6;
+    background:rgba(20,30,20,.72);color:#fff;border:none;border-radius:999px;
+    width:34px;height:34px;font-size:16px}
+  button{font-family:inherit;cursor:pointer}
+  #nightBtn{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom));left:50%;
+    transform:translateX(-50%);z-index:5;border:none;border-radius:16px;
+    background:linear-gradient(#5b4dbf,#3d3190);color:#fff;font-size:17px;font-weight:800;
+    padding:13px 26px;box-shadow:0 4px 0 #241c60, 0 6px 14px rgba(0,0,0,.35)}
+  #nightBtn:active{transform:translateX(-50%) translateY(3px);box-shadow:0 1px 0 #241c60}
+  #buildPanel{position:fixed;bottom:calc(84px + env(safe-area-inset-bottom));left:50%;
+    transform:translateX(-50%);z-index:5;display:flex;gap:8px;align-items:center;
+    background:rgba(20,30,20,.78);padding:8px;border-radius:16px;max-width:96vw;flex-wrap:wrap;justify-content:center}
+  #buildPanel button{border:none;border-radius:12px;padding:9px 12px;font-size:14px;font-weight:800;
+    background:linear-gradient(#f7b733,#e08e0b);color:#3a2500;box-shadow:0 3px 0 #9c6206}
+  #buildPanel button:disabled{filter:grayscale(1);opacity:.55;box-shadow:none}
+  #buildPanel .lbl{color:#fff;font-size:13px;font-weight:700;padding:0 4px}
+  #hint{position:fixed;bottom:calc(150px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);
+    color:#fff;text-shadow:0 2px 4px rgba(0,0,0,.5);font-weight:700;font-size:14px;z-index:4;
+    pointer-events:none;text-align:center;width:90vw}
+  .overlay{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;background:rgba(10,25,12,.82);color:#fff;text-align:center;padding:24px;gap:14px}
+  .overlay h1{font-size:34px;margin:0;text-shadow:0 3px 0 rgba(0,0,0,.4)}
+  .overlay h2{font-size:20px;margin:0}
+  .overlay p{margin:0;font-size:15px;line-height:1.65;opacity:.95;max-width:420px}
+  .overlay .big{border:none;border-radius:18px;font-size:20px;font-weight:900;padding:15px 42px;
+    background:linear-gradient(#ffd23e,#f5a201);color:#4a2d00;box-shadow:0 5px 0 #a86e02,0 8px 18px rgba(0,0,0,.4)}
+  .overlay .big:active{transform:translateY(4px);box-shadow:0 1px 0 #a86e02}
+  .hidden{display:none !important}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="topbar">
+  <div class="pill">🪙 <span id="uiCoins">0</span></div>
+  <div class="pill">🌙 Noite <span id="uiNight">1</span></div>
+  <div class="pill">🏰 <span id="uiCastle">100%</span></div>
+</div>
+<button id="muteBtn" title="Som">🔊</button>
+<div id="hint" class="hidden"></div>
+<div id="buildPanel" class="hidden"></div>
+<button id="nightBtn" class="hidden">⚔️ Iniciar a Noite</button>
+
+<div id="menu" class="overlay">
+  <h1>👑 Tiny King</h1>
+  <h2>Defesa do Reino</h2>
+  <p><em>A jogabilidade que os anúncios prometeram — de verdade.</em></p>
+  <p>🐎 Arraste na tela para cavalgar com o rei<br>
+     🔨 Aproxime-se dos canteiros para construir de dia<br>
+     🌙 Sobreviva às hordas quando a noite cair<br>
+     🪙 Inimigos derrotados e fazendas dão moedas</p>
+  <button id="playBtn" class="big">▶ Jogar</button>
+  <p id="menuBest" style="opacity:.8"></p>
+</div>
+
+<div id="over" class="overlay hidden">
+  <h1>💀 O reino caiu…</h1>
+  <p id="overText"></p>
+  <button id="retryBtn" class="big">↻ Tentar de novo</button>
+</div>
+
+<script src="game.js" defer></script>
+</body>
+</html>

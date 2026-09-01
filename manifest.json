@@ -1,0 +1,13 @@
+{
+  "name": "Tiny King — Defesa do Reino",
+  "short_name": "Tiny King",
+  "start_url": ".",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#6db84c",
+  "theme_color": "#3a8f3f",
+  "description": "Defenda o reino: construa torres de dia e sobreviva às hordas à noite.",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
